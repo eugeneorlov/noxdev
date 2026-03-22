@@ -21,7 +21,7 @@
   Add root .npmrc with shamefully-hoist=false.
 
 ## T2: CLI entry point with commander.js
-- STATUS: pending
+- STATUS: done
 - FILES: packages/cli/src/index.ts, packages/cli/src/commands/init.ts, packages/cli/src/commands/projects.ts, packages/cli/src/commands/run.ts, packages/cli/src/commands/status.ts, packages/cli/src/commands/log.ts, packages/cli/src/commands/merge.ts, packages/cli/src/commands/dashboard.ts
 - VERIFY: pnpm build && node packages/cli/dist/index.js --help
 - CRITIC: skip
