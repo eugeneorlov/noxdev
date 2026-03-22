@@ -101,7 +101,7 @@
   Use JSON.parse with try/catch and helpful error messages.
 
 ## T5: Implement noxdev init command
-- STATUS: pending
+- STATUS: done
 - FILES: packages/cli/src/commands/init.ts
 - VERIFY: pnpm build && node packages/cli/dist/index.js init test-project --repo /tmp/test-repo 2>&1 | grep -i "error\|created\|registered"
 - CRITIC: review
