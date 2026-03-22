@@ -1,13 +1,12 @@
-#!/usr/bin/env node
 import { createRequire } from "node:module";
 import { Command } from "commander";
-import { registerInitCommand } from "./commands/init.js";
-import { registerRunCommand } from "./commands/run.js";
-import { registerStatusCommand } from "./commands/status.js";
-import { registerLogCommand } from "./commands/log.js";
-import { registerMergeCommand } from "./commands/merge.js";
-import { registerProjectsCommand } from "./commands/projects.js";
-import { registerDashboardCommand } from "./commands/dashboard.js";
+import { registerInit } from "./commands/init.js";
+import { registerRun } from "./commands/run.js";
+import { registerStatus } from "./commands/status.js";
+import { registerLog } from "./commands/log.js";
+import { registerMerge } from "./commands/merge.js";
+import { registerProjects } from "./commands/projects.js";
+import { registerDashboard } from "./commands/dashboard.js";
 
 const require = createRequire(import.meta.url);
 const { version } = require("../package.json");
@@ -19,12 +18,12 @@ program
   .description("Autonomous overnight coding agent orchestrator")
   .version(version);
 
-registerInitCommand(program);
-registerRunCommand(program);
-registerStatusCommand(program);
-registerLogCommand(program);
-registerMergeCommand(program);
-registerProjectsCommand(program);
-registerDashboardCommand(program);
+registerInit(program);
+registerRun(program);
+registerStatus(program);
+registerLog(program);
+registerMerge(program);
+registerProjects(program);
+registerDashboard(program);
 
 program.parse();

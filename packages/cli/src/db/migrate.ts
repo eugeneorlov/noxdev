@@ -1,0 +1,81 @@
+import type Database from "better-sqlite3";
+
+// Schema is inlined for compatibility with tsup bundling.
+// Canonical schema definition lives in schema.sql.
+const SCHEMA = `
+CREATE TABLE IF NOT EXISTS projects (
+  id TEXT PRIMARY KEY,
+  display_name TEXT NOT NULL,
+  repo_path TEXT NOT NULL,
+  worktree_path TEXT NOT NULL,
+  branch TEXT NOT NULL,
+  test_command TEXT,
+  build_command TEXT,
+  lint_command TEXT,
+  docker_memory TEXT DEFAULT '4g',
+  docker_cpus INTEGER DEFAULT 2,
+  docker_timeout_seconds INTEGER DEFAULT 1800,
+  secrets_file TEXT,
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS runs (
+  id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL REFERENCES projects(id),
+  started_at TEXT NOT NULL,
+  finished_at TEXT,
+  auth_mode TEXT NOT NULL DEFAULT 'max',
+  total_tasks INTEGER DEFAULT 0,
+  completed INTEGER DEFAULT 0,
+  failed INTEGER DEFAULT 0,
+  skipped INTEGER DEFAULT 0,
+  status TEXT DEFAULT 'running',
+  log_file TEXT,
+  commit_before TEXT,
+  commit_after TEXT
+);
+
+CREATE TABLE IF NOT EXISTS task_results (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  run_id TEXT NOT NULL REFERENCES runs(id),
+  task_id TEXT NOT NULL,
+  title TEXT NOT NULL,
+  status TEXT NOT NULL,
+  exit_code INTEGER,
+  auth_mode TEXT,
+  critic_mode TEXT DEFAULT 'review',
+  push_mode TEXT DEFAULT 'auto',
+  attempt INTEGER DEFAULT 1,
+  commit_sha TEXT,
+  started_at TEXT,
+  finished_at TEXT,
+  duration_seconds INTEGER,
+  dev_log_file TEXT,
+  critic_log_file TEXT,
+  diff_file TEXT,
+  merge_decision TEXT DEFAULT 'pending',
+  merged_at TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_task_results_run ON task_results(run_id);
+CREATE INDEX IF NOT EXISTS idx_task_results_status ON task_results(status);
+
+CREATE TABLE IF NOT EXISTS tasks (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  run_id TEXT NOT NULL REFERENCES runs(id),
+  task_id TEXT NOT NULL,
+  title TEXT NOT NULL,
+  files TEXT,
+  verify TEXT,
+  critic TEXT DEFAULT 'review',
+  push TEXT DEFAULT 'auto',
+  spec TEXT,
+  status_before TEXT DEFAULT 'pending',
+  UNIQUE(run_id, task_id)
+);
+`;
+
+export function migrate(db: Database.Database): void {
+  db.exec(SCHEMA);
+}

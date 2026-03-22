@@ -1,10 +1,11 @@
 import type { Command } from "commander";
 
-export function registerStatusCommand(program: Command): void {
+export function registerStatus(program: Command): void {
   program
-    .command("status [project]")
+    .command("status")
     .description("Show project status")
-    .action(() => {
+    .argument("[project]", "project name")
+    .action((project: string | undefined) => {
       console.log("noxdev status — not yet implemented");
     });
 }

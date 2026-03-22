@@ -1,10 +1,11 @@
 import type { Command } from "commander";
 
-export function registerMergeCommand(program: Command): void {
+export function registerMerge(program: Command): void {
   program
-    .command("merge [project]")
+    .command("merge")
     .description("Merge completed branches")
-    .action(() => {
+    .argument("[project]", "project name")
+    .action((project: string | undefined) => {
       console.log("noxdev merge — not yet implemented");
     });
 }

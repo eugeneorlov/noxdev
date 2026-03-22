@@ -1,10 +1,11 @@
 import type { Command } from "commander";
 
-export function registerLogCommand(program: Command): void {
+export function registerLog(program: Command): void {
   program
-    .command("log <task-id>")
-    .description("Show logs for a task")
-    .action(() => {
+    .command("log")
+    .description("Show task log")
+    .argument("<task-id>", "task identifier")
+    .action((taskId: string) => {
       console.log("noxdev log — not yet implemented");
     });
 }

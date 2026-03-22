@@ -7,20 +7,20 @@
     "noxdev": "./dist/index.js"
   },
   "scripts": {
-    "build": "tsup src/index.ts --format esm --target node18 --dts --no-splitting",
+    "build": "tsup",
     "lint": "tsc --noEmit"
   },
   "dependencies": {
-    "commander": "^12.1.0",
-    "better-sqlite3": "^11.7.0",
+    "commander": "^13.1.0",
+    "better-sqlite3": "^11.8.1",
     "chalk": "^5.4.1",
-    "ora": "^8.1.1"
+    "ora": "^8.2.0"
   },
   "devDependencies": {
-    "tsup": "^8.3.0",
-    "typescript": "^5.7.0",
-    "@types/better-sqlite3": "^7.6.12",
-    "@types/node": "^22.10.0",
-    "vitest": "^2.1.0"
+    "tsup": "^8.4.0",
+    "typescript": "^5.7.3",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^22.13.10",
+    "vitest": "^3.0.9"
   }
 }

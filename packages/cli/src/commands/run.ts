@@ -1,12 +1,13 @@
 import type { Command } from "commander";
 
-export function registerRunCommand(program: Command): void {
+export function registerRun(program: Command): void {
   program
-    .command("run [project]")
+    .command("run")
     .description("Run coding tasks")
-    .option("--overnight", "Run in overnight mode")
-    .option("--all", "Run for all projects")
-    .action(() => {
+    .argument("[project]", "project name")
+    .option("--overnight", "run in overnight mode")
+    .option("--all", "run for all projects")
+    .action((project: string | undefined, opts: { overnight?: boolean; all?: boolean }) => {
       console.log("noxdev run — not yet implemented");
     });
 }
