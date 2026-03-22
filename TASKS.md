@@ -78,7 +78,7 @@
   Use CREATE TABLE IF NOT EXISTS so migrations are idempotent.
 
 ## T4: Config loader (global + per-project)
-- STATUS: pending
+- STATUS: done
 - FILES: packages/cli/src/config/index.ts, packages/cli/src/config/types.ts
 - VERIFY: pnpm build
 - CRITIC: skip
