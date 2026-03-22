@@ -1,7 +1,7 @@
 # noxdev Phase A: Foundation
 
 ## T1: Initialize Turborepo monorepo with pnpm workspaces
-- STATUS: pending
+- STATUS: done
 - FILES: package.json, pnpm-workspace.yaml, turbo.json, packages/cli/package.json, packages/dashboard/package.json, tsconfig.json
 - VERIFY: pnpm install && pnpm build
 - CRITIC: skip
