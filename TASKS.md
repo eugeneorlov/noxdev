@@ -42,7 +42,7 @@
   Make sure the built output at dist/index.js is executable (tsup banner with shebang).
 
 ## T3: SQLite schema and migration system
-- STATUS: pending
+- STATUS: done
 - FILES: packages/cli/src/db/schema.sql, packages/cli/src/db/index.ts, packages/cli/src/db/migrate.ts
 - VERIFY: pnpm build
 - CRITIC: review
