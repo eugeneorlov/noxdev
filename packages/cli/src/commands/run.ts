@@ -4,12 +4,14 @@ import { homedir } from "node:os";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { spawn, execSync } from "node:child_process";
 import chalk from "chalk";
+import type Database from "better-sqlite3";
 import { getDb } from "../db/index.js";
 import { getAllProjects, getProject } from "../db/queries.js";
 import { loadProjectConfig } from "../config/index.js";
 import { loadGlobalConfig } from "../config/index.js";
 import { resolveAuth } from "../auth/index.js";
 import { executeRun } from "../engine/orchestrator.js";
+import { parseTasksFromFile } from "../parser/tasks.js";
 import type { RunContext } from "../engine/types.js";
 
 function generateRunId(): string {
@@ -23,6 +25,22 @@ function generateRunId(): string {
     pad(now.getHours()),
     pad(now.getMinutes()),
     pad(now.getSeconds()),
+  ].join("");
+}
+
+function generateRunIdForProject(projectId: string): string {
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return [
+    now.getFullYear(),
+    pad(now.getMonth() + 1),
+    pad(now.getDate()),
+    "_",
+    pad(now.getHours()),
+    pad(now.getMinutes()),
+    pad(now.getSeconds()),
+    "_",
+    projectId,
   ].join("");
 }
 
@@ -69,6 +87,125 @@ async function runProject(project: ProjectRow): Promise<void> {
   };
 
   await executeRun(ctx);
+}
+
+export async function runAllProjects(
+  db: Database.Database,
+): Promise<void> {
+  const projects = getAllProjects(db) as ProjectRow[];
+  if (projects.length === 0) {
+    console.log("No registered projects. Run `noxdev init` first.");
+    return;
+  }
+
+  console.log(
+    chalk.bold(
+      `noxdev run --all: ${projects.length} registered projects`,
+    ),
+  );
+
+  // Resolve auth once before the loop
+  const globalConfig = loadGlobalConfig();
+  const auth = resolveAuth({
+    max: { preferred: globalConfig.accounts.max.preferred },
+    api: {
+      fallback: globalConfig.accounts.api.fallback,
+      dailyCapUsd: globalConfig.accounts.api.daily_cap_usd,
+      model: globalConfig.accounts.api.model,
+    },
+    secrets: {
+      provider: globalConfig.secrets.provider,
+      globalSecretsFile: globalConfig.secrets.global,
+      ageKeyFile: globalConfig.secrets.age_key,
+    },
+  });
+
+  const results: Array<{
+    displayName: string;
+    completed: number;
+    total: number;
+  }> = [];
+
+  for (let i = 0; i < projects.length; i++) {
+    const proj = projects[i];
+    const projectConfig = loadProjectConfig(proj.repo_path);
+
+    // Count pending tasks
+    const tasksFile = join(proj.worktree_path, projectConfig.tasks_file);
+    let pendingCount = 0;
+    try {
+      const pending = parseTasksFromFile(tasksFile);
+      pendingCount = pending.length;
+    } catch {
+      pendingCount = 0;
+    }
+
+    const time = new Date().toLocaleTimeString();
+    console.log(
+      `[${time}] Project ${i + 1}/${projects.length}: ${proj.display_name} (${pendingCount} pending tasks)`,
+    );
+
+    const runId = generateRunIdForProject(proj.id);
+    const gitDir = join(proj.repo_path, ".git");
+
+    const ctx: RunContext = {
+      projectId: proj.id,
+      projectConfig,
+      worktreeDir: proj.worktree_path,
+      projectGitDir: gitDir,
+      gitTargetPath: proj.worktree_path,
+      runId,
+      db,
+      auth,
+    };
+
+    let completed = 0;
+    let total = pendingCount;
+
+    try {
+      await executeRun(ctx);
+
+      // Query run results from DB
+      const run = db
+        .prepare("SELECT * FROM runs WHERE id = ?")
+        .get(runId) as
+        | { completed: number; total_tasks: number; failed: number }
+        | undefined;
+      if (run) {
+        completed = run.completed ?? 0;
+        total = run.total_tasks;
+
+        // Check circuit-break (all tasks failed)
+        if (run.failed === run.total_tasks && run.total_tasks > 0) {
+          console.log(
+            chalk.yellow(
+              `⚠ Project ${proj.display_name}: all tasks failed (circuit-break), continuing to next project`,
+            ),
+          );
+        }
+      }
+    } catch (err) {
+      console.log(
+        chalk.yellow(
+          `⚠ Project ${proj.display_name} failed: ${err instanceof Error ? err.message : String(err)}`,
+        ),
+      );
+    }
+
+    results.push({
+      displayName: proj.display_name,
+      completed,
+      total,
+    });
+  }
+
+  // Print multi-project summary
+  console.log("\n---");
+  console.log("MULTI-PROJECT RUN COMPLETE");
+  for (const r of results) {
+    console.log(`  ${r.displayName}: ${r.completed}/${r.total} completed`);
+  }
+  console.log("---");
 }
 
 function whichCommand(cmd: string): boolean {
@@ -164,20 +301,7 @@ export function registerRun(program: Command): void {
           const db = getDb();
 
           if (opts.all) {
-            const projects = getAllProjects(db) as ProjectRow[];
-            if (projects.length === 0) {
-              console.error(
-                chalk.red(
-                  "No projects registered. Run `noxdev init` first.",
-                ),
-              );
-              process.exitCode = 1;
-              return;
-            }
-
-            for (const proj of projects) {
-              await runProject(proj);
-            }
+            await runAllProjects(db);
             return;
           }
 

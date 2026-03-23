@@ -109,7 +109,7 @@
   Mock console.log to capture output.
 
 ## T3: Implement noxdev merge command (interactive CLI)
-- STATUS: pending
+- STATUS: done
 - FILES: packages/cli/src/commands/merge.ts, packages/cli/src/merge/interactive.ts, packages/cli/src/merge/__tests__/merge-logic.test.ts
 - VERIFY: cd packages/cli && pnpm build && pnpm vitest run src/merge/__tests__/merge-logic.test.ts
 - CRITIC: review
