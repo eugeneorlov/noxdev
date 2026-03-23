@@ -8,7 +8,8 @@
   },
   "scripts": {
     "build": "tsup",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
     "commander": "^13.1.0",
