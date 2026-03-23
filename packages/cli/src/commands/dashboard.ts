@@ -12,7 +12,7 @@ export function registerDashboard(program: Command): void {
     .option("--api-port <port>", "API port", "4400")
     .action(async (opts: { port: string; apiPort: string }) => {
       // Determine the dashboard package location
-      const dashboardDir = path.resolve(import.meta.dirname, "..", "..", "..", "dashboard");
+      const dashboardDir = path.resolve(import.meta.dirname, "..", "..", "..", "packages", "dashboard");
 
       if (!existsSync(dashboardDir)) {
         console.error(chalk.red("Dashboard not found. Run 'pnpm build' in the noxdev monorepo first."));
