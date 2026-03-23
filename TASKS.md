@@ -8,7 +8,7 @@
 # Session 3: T4, T5 (multi-project + summary)
 
 ## T1: Implement noxdev status command
-- STATUS: pending
+- STATUS: done
 - FILES: packages/cli/src/commands/status.ts, packages/cli/src/commands/__tests__/status.test.ts
 - VERIFY: cd packages/cli && pnpm build && pnpm vitest run src/commands/__tests__/status.test.ts
 - CRITIC: skip
