@@ -8,6 +8,7 @@
   },
   "scripts": {
     "build": "tsup",
+    "postbuild": "cp -r scripts dist/scripts",
     "lint": "tsc --noEmit",
     "test": "vitest run"
   },
