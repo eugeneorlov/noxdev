@@ -90,7 +90,7 @@
   and that tests can call on an in-memory db.
 
 ## T3: Prompt builder for task execution
-- STATUS: pending
+- STATUS: done
 - FILES: packages/cli/src/prompts/builder.ts, packages/cli/src/prompts/__tests__/builder.test.ts
 - VERIFY: cd packages/cli && pnpm build && pnpm vitest run src/prompts/__tests__/builder.test.ts
 - CRITIC: skip
@@ -159,7 +159,7 @@
   5. buildCriticPrompt → verify spec and diff appear in output, checklist present.
 
 ## T4: Auth module for Max-first with API fallback
-- STATUS: pending
+- STATUS: done
 - FILES: packages/cli/src/auth/index.ts, packages/cli/src/auth/__tests__/auth.test.ts
 - VERIFY: cd packages/cli && pnpm build && pnpm vitest run src/auth/__tests__/auth.test.ts
 - CRITIC: review
@@ -196,7 +196,7 @@
   touching real filesystem or running real sops commands.
 
 ## T5: Extract parameterized bash Docker scripts
-- STATUS: pending
+- STATUS: done
 - FILES: packages/cli/scripts/docker-run-max.sh, packages/cli/scripts/docker-run-api.sh, packages/cli/scripts/docker-capture-diff.sh
 - VERIFY: shellcheck packages/cli/scripts/*.sh 2>/dev/null || echo "shellcheck not installed, skipping" && test -x packages/cli/scripts/docker-run-max.sh
 - CRITIC: review
@@ -242,7 +242,7 @@
   Make all scripts chmod +x. Add a comment header to each script with usage.
 
 ## T6: Docker runner TypeScript wrapper
-- STATUS: pending
+- STATUS: done
 - FILES: packages/cli/src/docker/runner.ts, packages/cli/src/docker/types.ts
 - VERIFY: cd packages/cli && pnpm build
 - CRITIC: review
