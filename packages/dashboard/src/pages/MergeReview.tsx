@@ -141,7 +141,7 @@ export default function MergeReview() {
 
     setSendingDecisions(prev => new Set([...prev, taskId]));
     try {
-      const response = await fetch(`/api/runs/${run.id}/tasks/${taskId}/decision`, {
+      const response = await fetch(`/api/runs/${run.id}/tasks/${taskId}/merge`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

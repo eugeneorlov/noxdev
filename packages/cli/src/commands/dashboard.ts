@@ -36,7 +36,22 @@ export function registerDashboard(program: Command): void {
         const app = express();
 
         // Mount API routes first
-        // TODO: Add API routes here when they exist
+        try {
+          const serverModule = await import(path.resolve(dashboardDir, 'dist', 'api', 'server.js'));
+          // The server.js exports an app with routes already mounted
+          // We need to copy the routes to our app
+          const apiApp = serverModule.app;
+          if (apiApp && apiApp._router) {
+            // Mount the entire API router
+            app.use(apiApp);
+          }
+        } catch (error) {
+          console.warn('Could not load API routes:', error);
+          // Fallback health check
+          app.get('/api/health', (req: any, res: any) => {
+            res.json({ status: 'ok', db: false });
+          });
+        }
 
         // Serve static dashboard files for all other routes
         app.use(express.static(dashboardDir));
