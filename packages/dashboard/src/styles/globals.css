@@ -1,0 +1,9 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --nox-owl: #C9A84C;
+  --nox-dark: #1a1a2e;
+  --nox-accent: #16213e;
+}
