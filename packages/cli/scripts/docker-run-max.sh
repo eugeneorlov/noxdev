@@ -28,8 +28,8 @@ prompt_file="$1"
 task_log="$2"
 timeout_seconds="$3"
 worktree_dir="$4"
-# project_git_dir="$5"  # reserved
-# git_target_path="$6"  # reserved
+project_git_dir="$5"  # reserved
+git_target_path="$6"  # reserved
 memory_limit="$7"
 cpu_limit="$8"
 docker_image="$9"
@@ -41,6 +41,7 @@ docker run --rm \
   --memory="$memory_limit" \
   --cpus="$cpu_limit" \
   -v "$worktree_dir":/workspace \
+  -v "$project_git_dir":/project-git:ro \
   -v "$prompt_file":/tmp/prompt.md:ro \
   -v /tmp/.claude.json.bak:/root/.claude.json \
   --workdir /workspace \
@@ -49,7 +50,9 @@ docker run --rm \
     git config --global user.email "noxdev@local"
     git config --global user.name "noxdev"
     git config --global safe.directory /workspace
-    timeout '"$timeout_seconds"' claude --print --output-format stream-json \
+    git config --global safe.directory /project-git
+    echo "gitdir: /project-git/worktrees/'"$(basename "$worktree_dir")"'" > /workspace/.git
+    timeout '"$timeout_seconds"' claude --print --verbose --output-format stream-json \
       -p "$(cat /tmp/prompt.md)" \
       --model claude-sonnet-4-20250514 \
       --max-turns 30 \

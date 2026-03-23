@@ -40,6 +40,7 @@ docker run --rm \
   --memory="$memory_limit" \
   --cpus="$cpu_limit" \
   -v "$worktree_dir":/workspace \
+  -v "$project_git_dir":/project-git:ro \
   -v "$prompt_file":/tmp/prompt.md:ro \
   -e ANTHROPIC_API_KEY="$api_key" \
   --workdir /workspace \
@@ -48,7 +49,9 @@ docker run --rm \
     git config --global user.email "noxdev@local"
     git config --global user.name "noxdev"
     git config --global safe.directory /workspace
-    timeout '"$timeout_seconds"' claude --print --output-format stream-json \
+    git config --global safe.directory /project-git
+    echo "gitdir: /project-git/worktrees/'"$(basename "$worktree_dir")"'" > /workspace/.git
+    timeout '"$timeout_seconds"' claude --print --verbose --output-format stream-json \
       -p "$(cat /tmp/prompt.md)" \
       --model claude-sonnet-4-20250514 \
       --max-turns 30 \
