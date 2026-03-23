@@ -175,7 +175,7 @@
   Mock child_process.execSync for git operations. Use in-memory SQLite for db tests.
 
 ## T4: Multi-project sequential run (--all flag)
-- STATUS: pending
+- STATUS: done
 - FILES: packages/cli/src/commands/run.ts, packages/cli/src/commands/__tests__/run-multi.test.ts
 - VERIFY: cd packages/cli && pnpm build && pnpm vitest run src/commands/__tests__/run-multi.test.ts
 - CRITIC: skip

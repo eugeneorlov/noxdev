@@ -9,6 +9,10 @@ import {
   getProject,
   getAllProjects,
 } from "../db/queries.js";
+import {
+  getAllProjectSummaries,
+  formatSummaryTable,
+} from "../engine/summary.js";
 
 interface RunRow {
   id: string;
@@ -120,12 +124,20 @@ export function showProjectStatus(db: Database.Database, projectId: string): voi
   }
 }
 
+function isRecentRun(startedAt: string): boolean {
+  const dateStr = startedAt.endsWith("Z") ? startedAt : startedAt + "Z";
+  const then = new Date(dateStr).getTime();
+  const diffMs = Date.now() - then;
+  return diffMs < 24 * 3_600_000;
+}
+
 export function registerStatus(program: Command): void {
   program
     .command("status")
     .description("Show project status")
     .argument("[project]", "project name")
-    .action((project: string | undefined) => {
+    .option("--summary", "Show only the summary table, no per-project detail")
+    .action((project: string | undefined, opts: { summary?: boolean }) => {
       try {
         const db = getDb();
 
@@ -140,14 +152,30 @@ export function registerStatus(program: Command): void {
           return;
         }
 
-        if (projects.length === 1) {
+        if (projects.length === 1 && !opts.summary) {
           showProjectStatus(db, projects[0].id);
           return;
         }
 
-        for (const p of projects) {
-          showProjectStatus(db, p.id);
-          console.log("---");
+        // Multi-project: show summary table
+        const summaries = getAllProjectSummaries(db);
+        console.log(formatSummaryTable(summaries));
+
+        if (opts.summary) {
+          return;
+        }
+
+        // Show detailed status for projects with recent runs (last 24h)
+        const recentProjects = summaries.filter(
+          (s) => s.startedAt && isRecentRun(s.startedAt),
+        );
+
+        if (recentProjects.length > 0) {
+          console.log("");
+          for (const s of recentProjects) {
+            console.log("---");
+            showProjectStatus(db, s.projectId);
+          }
         }
       } catch (err: unknown) {
         console.error(
