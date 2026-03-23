@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { ChevronRight } from 'lucide-react';
 import { StatusBadge } from './StatusBadge';
 import { useApi } from '../hooks/useApi';
 
@@ -102,8 +103,12 @@ export function TaskRow({ task, runId }: TaskRowProps) {
           {getMergeDecisionBadge(task.merge_decision)}
         </div>
 
-        <div className="flex-shrink-0 text-gray-400 dark:text-gray-500">
-          {isExpanded ? '▼' : '▶'}
+        <div className="flex-shrink-0">
+          <ChevronRight
+            className={`w-4 h-4 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-transform duration-200 ${
+              isExpanded ? 'rotate-90' : ''
+            }`}
+          />
         </div>
       </div>
 
