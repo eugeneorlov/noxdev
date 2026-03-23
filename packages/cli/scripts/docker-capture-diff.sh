@@ -30,6 +30,9 @@ output_file="$2"
 
 cd "$worktree_dir"
 
+# Stage untracked files as intent-to-add so they appear in git diff
+git add -N . 2>/dev/null || true
+
 {
   git diff HEAD || true
   echo "---STAGED---"
@@ -40,5 +43,8 @@ cd "$worktree_dir"
     cat "$f" 2>/dev/null || true
   done
 } > "$output_file"
+
+# Unstage intent-to-add files to restore working directory state
+git reset HEAD . 2>/dev/null || true
 
 exit 0
