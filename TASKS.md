@@ -1,243 +1,368 @@
-# noxdev Phase C: Review Workflow
+# noxdev Phase E: v1 Polish & Ship
 
-# Dependencies: Phase B complete (run engine, parser, db queries, docker runner, auth)
+# Dependencies: Phase D complete (dashboard working), manual bugfixes merged
 # Gate between sessions: pnpm build && pnpm test
 #
-# Session 1: T1, T2 (read-only commands — status + log)
-# Session 2: T3 (interactive merge — the complex one)
-# Session 3: T4, T5 (multi-project + summary)
+# Session 1: T1 (critic auth fix — test manually after)
+# Session 2: T2, T3 (CLI branding — doctor + ASCII owl + version)
+# Session 3: T4, T5 (dashboard polish — theme toggle + owl branding)
+# Session 4: T6 (npm publish prep — bundled dashboard, package metadata)
+# Session 5: T7, T8 (docs — README + LICENSE + CHANGELOG)
+#
+# IMPORTANT: After T1 lands, run a real task with CRITIC: review to validate the fix.
+# After T6 lands, test: npm pack && npm install -g noxdev-0.1.0.tgz && noxdev --help
 
-## T1: Implement noxdev status command
-- STATUS: done
-- FILES: packages/cli/src/commands/status.ts, packages/cli/src/commands/__tests__/status.test.ts
-- VERIFY: cd packages/cli && pnpm build && pnpm vitest run src/commands/__tests__/status.test.ts
+## T1: Fix critic agent auth — credential snapshot before Docker runs
+- STATUS: pending
+- FILES: packages/cli/src/commands/run.ts, packages/cli/scripts/docker-run-max.sh, packages/cli/scripts/docker-run-api.sh
+- VERIFY: pnpm build
+- CRITIC: skip
+- PUSH: gate
+- SPEC: Fix the critic agent authentication failure. The bug: the developer agent's
+  Docker container moves ~/.claude.json to a backup location (~/.claude/backups/).
+  When the critic agent runs in a second container, the credentials are gone.
+  Fix with a two-part credential snapshot approach:
+  Part 1 — In packages/cli/src/commands/run.ts, BEFORE the task loop starts
+  (before the for-of loop that iterates tasks), add a credential snapshot step:
+  ```
+  import { copyFileSync, existsSync, mkdirSync } from 'node:fs';
+  const claudeJsonSrc = path.join(os.homedir(), '.claude.json');
+  const snapshotDir = path.join(os.homedir(), '.noxdev');
+  const claudeSnapshot = path.join(snapshotDir, '.claude-snapshot.json');
+  if (existsSync(claudeJsonSrc)) {
+    mkdirSync(snapshotDir, { recursive: true });
+    copyFileSync(claudeJsonSrc, claudeSnapshot);
+    console.log(chalk.dim('  Credential snapshot saved'));
+  }
+  ```
+  Part 2 — In BOTH packages/cli/scripts/docker-run-max.sh AND docker-run-api.sh,
+  add a credential restore step at the VERY TOP of the script, before the docker run:
+  ```
+  CRED_SNAPSHOT="$HOME/.noxdev/.claude-snapshot.json"
+  if [ -f "$CRED_SNAPSHOT" ]; then
+    cp "$CRED_SNAPSHOT" "$HOME/.claude.json"
+  fi
+  ```
+  This ensures that before EVERY Docker container (developer OR critic), the
+  credentials are restored from the snapshot taken at run start. The snapshot is
+  taken once per run, before any container can corrupt the original file.
+  Do NOT change anything else in run.ts or the Docker scripts. The existing
+  Docker mount pattern, volume mounts, and Claude Code flags are battle-tested.
+
+## T2: noxdev doctor — prerequisite checker command
+- STATUS: pending
+- FILES: packages/cli/src/commands/doctor.ts, packages/cli/src/index.ts
+- VERIFY: pnpm build && node packages/cli/dist/index.js doctor
 - CRITIC: skip
 - PUSH: auto
-- SPEC: Implement the status command for morning review. Replace the stub in status.ts.
-  When user runs "noxdev status [project]":
-  1. If project argument provided, use it. If not, query all projects from SQLite.
-     If only one project registered, use it automatically.
-     If multiple projects and no argument, show status for ALL projects (iterate each).
-  2. For each project, query the latest run using getLatestRun(db, projectId).
-  3. If no runs exist, print: "{projectId}: No runs yet. Run: noxdev run {projectId}"
-  4. If a run exists, query task results using getTaskResults(db, runId).
-  5. Display formatted output using chalk:
-     ---
-     noxdev status: {displayName}
-     Run {runId} · {relative time ago} · {status}
+- SPEC: Create a "noxdev doctor" command that checks all prerequisites for running noxdev.
+  File: packages/cli/src/commands/doctor.ts
+  Register as a new subcommand in packages/cli/src/index.ts (import and register
+  alongside the existing commands, same pattern as init/run/status/etc).
+  The doctor command runs these checks in order, printing pass/fail for each:
+  1. Node.js version >= 18: check process.version, parse major. Pass: green checkmark.
+     Fail: red X + "Node.js 18+ required, found {version}"
+  2. Docker installed: run "docker --version" via child_process.execSync in try/catch.
+     Pass: green checkmark + version string. Fail: red X + "Docker not found. Install: https://docs.docker.com/get-docker/"
+  3. Docker daemon running: run "docker info" via execSync in try/catch.
+     Pass: green checkmark. Fail: red X + "Docker daemon not running. Start Docker Desktop or run: sudo systemctl start docker"
+  4. Docker image exists: run "docker images -q noxdev-runner:latest" via execSync.
+     Pass if output is non-empty: green checkmark. Fail: yellow warning +
+     "noxdev-runner image not found. Build it with: docker build -t noxdev-runner ."
+  5. noxdev config directory: check if ~/.noxdev/ exists. Pass: green checkmark.
+     Fail: yellow warning + "No config directory. Run: noxdev init <project>"
+  6. SQLite database: check if ~/.noxdev/ledger.db exists and is readable. Try opening
+     with better-sqlite3 and running "SELECT count(*) FROM projects". Pass: green checkmark +
+     "{n} projects registered". Fail: yellow warning + "No database. Run: noxdev init <project>"
+  7. Git installed: run "git --version" via execSync. Pass: green checkmark. Fail: red X.
+  8. SOPS installed: run "sops --version" via execSync. Pass: green checkmark.
+     Fail: yellow warning + "SOPS not found. Secrets encryption unavailable."
+  9. Claude credentials: check if ~/.claude.json exists. Pass: green checkmark.
+     Fail: red X + "Claude credentials not found. Run: claude login"
+  Use chalk for colored output. Format: "[✓] Check name" (green) or "[✗] Check name" (red)
+  or "[!] Check name" (yellow for warnings that don't block operation).
+  At the end, print a summary: "X/9 checks passed. {ready|issues found}"
+  Exit code 0 if all critical checks pass (Node, Docker installed, Docker running, Git, Claude creds).
+  Exit code 1 if any critical check fails.
 
-     Tasks: {completed} completed, {failed} failed, {skipped} skipped (of {total})
-
-     Commits:
-       T1: {title}  {status badge}  {commit SHA or "no commit"}  {duration}s
-       T2: {title}  {status badge}  {commit SHA or "no commit"}  {duration}s
-       ...
-
-     Pending merge: {count} tasks awaiting review
-     Next step: noxdev merge {projectId}
-     ---
-  6. Status badges with chalk colors: COMPLETED = green, FAILED = red,
-     SKIPPED = yellow, COMPLETED_RETRY = green with "(retry)" suffix.
-  7. Relative time: use the same logic from the projects command
-     (<1h = "Xm ago", <24h = "Xh ago", <7d = "Xd ago", else date).
-  8. If run status is 'running', show: "Run in progress since {time}..."
-  File: packages/cli/src/commands/__tests__/status.test.ts
-  Tests using vitest with in-memory SQLite:
-  1. Status with one completed run → verify output includes task count and commit SHAs.
-  2. Status with no runs → verify "No runs yet" message.
-  3. Status with pending merge tasks → verify "Pending merge" count.
-  4. Status with running run → verify "in progress" message.
-  Mock console.log to capture output. Use the db query layer from Phase B
-  (import runMigrations, insertRun, insertTaskResult, etc.).
-
-## T2: Implement noxdev log command
-- STATUS: done
-- FILES: packages/cli/src/commands/log.ts, packages/cli/src/commands/__tests__/log.test.ts
-- VERIFY: cd packages/cli && pnpm build && pnpm vitest run src/commands/__tests__/log.test.ts
+## T3: CLI ASCII art owl header and --version flag
+- STATUS: pending
+- FILES: packages/cli/src/index.ts, packages/cli/src/brand.ts, packages/cli/package.json
+- VERIFY: pnpm build && node packages/cli/dist/index.js --version && node packages/cli/dist/index.js --help
 - CRITIC: skip
 - PUSH: auto
-- SPEC: Implement the log command for detailed task inspection. Replace the stub in log.ts.
-  When user runs "noxdev log <task-id>":
-  1. The task-id is required (e.g. "T3"). If missing, print usage and exit.
-  2. Query task_results from SQLite WHERE task_id = taskId, ordered by run_id DESC.
-     This shows all executions of this task across runs (most recent first).
-  3. For the most recent execution, also query the task cache (tasks table) to get
-     the full spec, files, verify, critic, push fields.
-  4. Display formatted output using chalk:
-     ---
-     noxdev log: {taskId} — {title}
+- SPEC: Add branding to the noxdev CLI.
+  File: packages/cli/src/brand.ts — Create a new file exporting the brand constants:
+  Export const OWL_ASCII as this exact string (preserve indentation with spaces):
+  ```
+     ,___,
+     [O.O]
+    /)   )\
+   " \|/ "
+  ---m-m---
+  ```
+  Export const BANNER that combines the owl + text:
+  ```
+     ,___,
+     [O.O]       noxdev v{version}
+    /)   )\      ship code while you sleep
+   " \|/ "
+  ---m-m---
+  ```
+  The {version} placeholder gets replaced at runtime with the actual version from package.json.
+  Export const TAGLINE = "🦉 noxdev — ship code while you sleep"
+  File: packages/cli/src/index.ts — Make these changes:
+  1. Add .version() to the commander program using the version from package.json.
+     Import { readFileSync } from 'node:fs' and read the version from the built package.json,
+     or hardcode "0.1.0" and update it before publish.
+  2. When noxdev is invoked with NO subcommand (just "noxdev" with no args), print the
+     full BANNER in muted gold/yellow color using chalk.hex('#C9A84C'), then print the
+     help text. This replaces the default commander help-only output.
+  3. When noxdev is invoked with a subcommand (like "noxdev run"), do NOT print the banner.
+     Only the bare "noxdev" invocation shows the owl.
+  Update packages/cli/package.json version to "0.1.0".
 
-     Latest run: {runId} · {status badge} · attempt {attempt}
+## T4: Dashboard dark/light theme toggle
+- STATUS: pending
+- FILES: packages/dashboard/tailwind.config.ts, packages/dashboard/src/App.tsx, packages/dashboard/src/components/ThemeToggle.tsx, packages/dashboard/src/styles/globals.css
+- VERIFY: cd packages/dashboard && pnpm build
+- CRITIC: skip
+- PUSH: auto
+- SPEC: Add dark mode support to the dashboard with a toggle button.
+  File: packages/dashboard/tailwind.config.ts — Add darkMode: 'class' to the config.
+  File: packages/dashboard/src/styles/globals.css — Add dark mode CSS variables.
+  Under the existing :root variables, add:
+  ```css
+  :root {
+    --nox-bg: #ffffff;
+    --nox-surface: #f9fafb;
+    --nox-text: #111827;
+    --nox-text-muted: #6b7280;
+    --nox-border: #e5e7eb;
+  }
+  .dark {
+    --nox-bg: #0f0f1a;
+    --nox-surface: #1a1a2e;
+    --nox-text: #e5e7eb;
+    --nox-text-muted: #9ca3af;
+    --nox-border: #2d2d44;
+    --nox-owl: #C9A84C;
+  }
+  body {
+    background-color: var(--nox-bg);
+    color: var(--nox-text);
+  }
+  ```
+  File: packages/dashboard/src/components/ThemeToggle.tsx
+  A toggle button component. Uses React useState initialized from localStorage
+  key 'noxdev-theme' (default: 'light'). On toggle, adds/removes 'dark' class
+  on document.documentElement and saves preference to localStorage.
+  Icon: use lucide-react Sun icon for light mode, Moon icon for dark mode.
+  Styled as a round button in the header bar: p-2 rounded-full hover:bg-gray-100
+  dark:hover:bg-gray-800 transition-colors.
+  File: packages/dashboard/src/App.tsx — Import ThemeToggle and add it to the
+  header/nav area, right-aligned next to the existing navigation links.
+  Also add useEffect on mount to check localStorage and apply 'dark' class
+  if the saved preference is 'dark'.
+  Update ALL existing page and component files to use dark: variants on key elements:
+  - Card backgrounds: bg-white dark:bg-[var(--nox-surface)]
+  - Card borders: border-gray-200 dark:border-[var(--nox-border)]
+  - Text: text-gray-900 dark:text-gray-100
+  - Muted text: text-gray-500 dark:text-gray-400
+  - Hover states: hover:bg-gray-50 dark:hover:bg-gray-800
+  - The layout background: bg-gray-50 dark:bg-[var(--nox-bg)]
+  Focus on the main visible elements — cards, headers, badges, the layout wrapper.
+  Don't miss the StatusBadge component (it needs dark-friendly colors too).
 
-     Spec:
-       {full spec text, indented 2 spaces}
+## T5: Dashboard owl logo and footer branding
+- STATUS: pending
+- FILES: packages/dashboard/src/App.tsx, packages/dashboard/public/owl-logo.svg
+- VERIFY: cd packages/dashboard && pnpm build
+- CRITIC: skip
+- PUSH: auto
+- SPEC: Add the owl logo to the dashboard header and update footer branding.
+  File: packages/dashboard/public/owl-logo.svg — Create an SVG owl logo.
+  Design a simple, clean owl face icon in SVG (32x32 viewBox). The owl should have:
+  - Round head shape
+  - Two large circular eyes with the muted gold color #C9A84C for the irises
+  - Small triangular beak
+  - Two small ear tufts at the top
+  - Dark outline strokes (#1a1a2e for light mode compatibility)
+  Keep it minimal and geometric — it needs to look good at 24px and 48px.
+  File: packages/dashboard/src/App.tsx — Update the header:
+  1. Replace the owl emoji in the header with an <img> tag loading /owl-logo.svg
+     at 28px height. Add alt="noxdev owl logo".
+  2. Update the footer to: 🦉 noxdev — ship code while you sleep
+     Style the owl emoji slightly larger. Add a subtle gold color to "noxdev" using
+     the --nox-owl CSS variable. Keep "ship code while you sleep" in muted text.
+  3. Make sure the header logo + text link to the Overview page (/).
 
-     Files: {files list or "none specified"}
-     Verify: {verify command}
-     Critic: {critic mode}  Push: {push mode}
-
-     Execution:
-       Started:   {startedAt}
-       Finished:  {finishedAt}
-       Duration:  {durationSeconds}s
-       Exit code: {exitCode}
-       Auth mode: {authMode}
-       Commit:    {commitSha or "none"}
-
-     Merge: {mergeDecision}
-
-     Logs:
-       Dev agent:  {devLogFile or "not available"}
-       Critic:     {criticLogFile or "not available"}
-       Diff:       {diffFile or "not available"}
-     ---
-  5. If the log files exist on disk, offer to show them:
-     "View dev agent log? Run: cat {devLogFile}"
-     (Don't cat them inline — they can be huge. Just show the path.)
-  6. If task has been executed multiple times (multiple runs), show a history section:
-     ---
-     History:
-       Run {runId1}: {status} · {duration}s · attempt {attempt}
-       Run {runId2}: {status} · {duration}s · attempt {attempt}
-     ---
-  File: packages/cli/src/commands/__tests__/log.test.ts
-  Tests using vitest with in-memory SQLite:
-  1. Log with one execution → verify all fields displayed.
-  2. Log with multiple executions → verify history section.
-  3. Log with unknown task-id → verify "not found" message.
-  4. Log shows spec from tasks cache → verify spec text appears.
-  Mock console.log to capture output.
-
-## T3: Implement noxdev merge command (interactive CLI)
-- STATUS: done
-- FILES: packages/cli/src/commands/merge.ts, packages/cli/src/merge/interactive.ts, packages/cli/src/merge/__tests__/merge-logic.test.ts
-- VERIFY: cd packages/cli && pnpm build && pnpm vitest run src/merge/__tests__/merge-logic.test.ts
+## T6: npm publish preparation — bundle dashboard, package metadata
+- STATUS: pending
+- FILES: packages/cli/package.json, packages/cli/tsup.config.ts, packages/cli/src/commands/dashboard.ts
+- VERIFY: cd packages/cli && pnpm build && ls dist/dashboard/index.html && node dist/index.js dashboard --help
 - CRITIC: review
 - PUSH: gate
-- SPEC: Implement the interactive merge command. This is the core morning review experience.
-  File: packages/cli/src/merge/interactive.ts
-  This module handles the merge logic, separated from the command for testability.
-  Export interface MergeCandidate { taskResultId: number; taskId: string; title: string;
-  status: string; commitSha: string; diffFile: string | null; }
-  Export interface MergeDecision { taskResultId: number; taskId: string;
-  decision: 'approved' | 'rejected' | 'skipped'; }
-  Export function getMergeCandidates(db: Database, projectId: string): MergeCandidate[]
-  Logic: get latest run for project, then query task_results where run_id = latestRun.id
-  AND status IN ('COMPLETED', 'COMPLETED_RETRY') AND merge_decision = 'pending'
-  AND commit_sha IS NOT NULL. Return as MergeCandidate array.
-  Export function getDiffStats(worktreeDir: string, commitSha: string): string
-  Run: git show --stat --format="" {commitSha} in the worktree. Returns the stat summary
-  like "+14 -2 in src/components/CoffeeRoulette.tsx". Use execSync.
-  Export function getFullDiff(worktreeDir: string, commitSha: string): string
-  Run: git show {commitSha} in the worktree. Returns full diff. Use execSync.
-  Export function applyMergeDecisions(db: Database, worktreeDir: string,
-  projectGitDir: string, decisions: MergeDecision[]): { merged: number; rejected: number; skipped: number }
-  Logic:
-  1. For each rejected decision: run `git revert --no-commit {commitSha}` then
-     `git commit -m "noxdev: revert {taskId} (rejected in merge review)"` in the worktree.
-     Update SQLite merge_decision = 'rejected' and merged_at = now.
-  2. For each approved decision: update SQLite merge_decision = 'approved' and merged_at = now.
-  3. For each skipped decision: leave merge_decision as 'pending' (no SQLite update).
-  4. After all decisions processed, if any approved: run git merge from main.
-     cd to the PROJECT repo dir (not worktree), run:
-     `git merge {worktree_branch} -m "noxdev: merge {n} approved tasks from run {runId}"`.
-  5. Return counts.
-  File: packages/cli/src/commands/merge.ts
-  Replace the stub. When user runs "noxdev merge [project]":
-  1. Resolve project (same logic as status: argument, single project, or error if ambiguous).
-  2. Load project from SQLite to get worktreeDir and branch.
-  3. Call getMergeCandidates. If empty, print "No pending merge tasks." and exit.
-  4. Print header: "Run {runId}: {n} tasks pending review"
-  5. For each candidate, display interactively:
-     ---
-     {taskId}: {title} [{status}]
-        commit: {shortSha}  {diffStats}
-        [a]pprove  [r]eject  [d]iff  [s]kip  >
-     ---
-  6. Read user input using Node.js readline (createInterface with process.stdin/stdout).
-     Handle single keypress: 'a' = approve, 'r' = reject, 'd' = show full diff then
-     re-prompt with [a]pprove [r]eject, 's' = skip.
-  7. After all candidates reviewed, print summary:
-     "Summary: {approved} approved, {rejected} rejected, {skipped} skipped"
-  8. If any approved, prompt: "Merge {n} approved commits to main? [y/n]"
-  9. If confirmed, call applyMergeDecisions and print result.
-  10. Print: "Run 'git push origin main' when ready."
-  Important: the readline interface must be properly closed after use to avoid
-  the process hanging. Use rl.close() in a finally block.
-  File: packages/cli/src/merge/__tests__/merge-logic.test.ts
-  Tests for the merge LOGIC (not the interactive readline part):
-  1. getMergeCandidates returns only COMPLETED tasks with pending merge and commit_sha.
-  2. getMergeCandidates returns empty array when no pending tasks.
-  3. getDiffStats and getFullDiff are tested by mocking execSync.
-  4. applyMergeDecisions with all approved → verify SQLite updated, merge count correct.
-  5. applyMergeDecisions with mixed decisions → verify rejected get reverted in SQLite,
-     approved get merged, skipped unchanged.
-  Mock child_process.execSync for git operations. Use in-memory SQLite for db tests.
+- SPEC: Prepare the CLI package for npm publish as a standalone installable.
+  The key change: bundle the dashboard build output INSIDE the CLI dist/ so that
+  "npm install -g noxdev" gives users both the CLI and the dashboard.
+  Part 1 — Update packages/cli/package.json:
+  Change "name" from "@noxdev/cli" to "noxdev".
+  Add these fields:
+  ```json
+  "description": "Autonomous overnight coding agent orchestrator — ship code while you sleep",
+  "keywords": ["cli", "ai", "coding-agent", "docker", "autonomous", "claude", "devtools"],
+  "author": "Eugene Orlov",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/eugeneorlov/noxdev"
+  },
+  "homepage": "https://github.com/eugeneorlov/noxdev",
+  "engines": { "node": ">=18.0.0" },
+  "files": ["dist/", "scripts/", "README.md", "LICENSE"]
+  ```
+  Part 2 — Update the postbuild script in packages/cli/package.json:
+  Change from: "postbuild": "rm -rf dist/scripts && cp -r scripts dist/scripts"
+  To: "postbuild": "rm -rf dist/scripts && cp -r scripts dist/scripts && rm -rf dist/dashboard && cp -r ../dashboard/dist dist/dashboard"
+  This copies the built dashboard (Vite output) into cli/dist/dashboard/.
+  The Turborepo build pipeline ensures dashboard builds before CLI, so the files exist.
+  Part 3 — Update packages/cli/src/commands/dashboard.ts:
+  Change the dashboard path resolution. Currently it resolves relative to the monorepo.
+  For npm global installs, the dashboard is bundled at dist/dashboard/.
+  Replace the dashboardDir resolution with:
+  ```typescript
+  // Look for bundled dashboard first (npm global install), then monorepo path (dev)
+  const bundledDashboard = path.resolve(import.meta.dirname, '..', 'dashboard');
+  const monorepoDevDashboard = path.resolve(import.meta.dirname, '..', '..', '..', 'packages', 'dashboard');
+  const dashboardDir = existsSync(path.join(bundledDashboard, 'index.html'))
+    ? bundledDashboard
+    : monorepoDevDashboard;
+  ```
+  For the bundled case, the dashboard is pre-built static files — no Vite dev server needed.
+  Change the UI server logic: if the dashboard dir contains index.html directly (bundled),
+  serve it with a simple Express static file server instead of spawning Vite:
+  ```typescript
+  import express from 'express';
+  // ... inside the action handler:
+  if (existsSync(path.join(dashboardDir, 'index.html'))) {
+    // Bundled mode: serve static files from the same Express server
+    // Add static file serving to the API server instead of a separate process
+  }
+  ```
+  Actually, the simplest approach for v1: serve the dashboard static files from the
+  SAME Express server as the API. Update the API server (or the dashboard command)
+  to mount express.static(dashboardDir) at '/' AFTER the /api routes. Then only
+  one server process is needed (port 4400). The API serves /api/* routes, and
+  serves the React SPA for everything else.
+  For the monorepo dev case, keep the existing Vite dev server behavior.
+  Remove the check for dist/api/server.js — in bundled mode, the dashboard command
+  starts its own Express server inline (not from a separate built file).
+  Part 4 — Make sure turbo.json has the correct dependency. The CLI build must
+  depend on the dashboard build. In turbo.json, update the build pipeline:
+  ```json
+  "build": {
+    "dependsOn": ["^build"]
+  }
+  ```
+  This ensures pnpm build always builds dashboard first, then CLI (which copies
+  dashboard dist into its own dist/).
 
-## T4: Multi-project sequential run (--all flag)
-- STATUS: done
-- FILES: packages/cli/src/commands/run.ts, packages/cli/src/commands/__tests__/run-multi.test.ts
-- VERIFY: cd packages/cli && pnpm build && pnpm vitest run src/commands/__tests__/run-multi.test.ts
-- CRITIC: skip
-- PUSH: auto
-- SPEC: Extend the run command to support --all flag for multi-project sequential execution.
-  In packages/cli/src/commands/run.ts:
-  1. When --all flag is set, query all registered projects from SQLite using getAllProjects.
-  2. Print header: "noxdev run --all: {n} registered projects"
-  3. Iterate projects sequentially. For each project:
-     a. Print: "[{time}] Project {i}/{n}: {displayName} ({pendingCount} pending tasks)"
-     b. Load project config.
-     c. Resolve auth (same auth for all projects, resolved once before the loop).
-     d. Generate a unique runId per project: YYYYMMDD_HHmmss_{projectId}
-     e. Build RunContext and call executeRun.
-     f. If a project circuit-breaks (all tasks fail), print warning and continue to next project.
-  4. After all projects, print multi-project summary:
-     ---
-     MULTI-PROJECT RUN COMPLETE
-       {project1}: {completed}/{total} completed
-       {project2}: {completed}/{total} completed
-       ...
-     ---
-  5. If --overnight is also set with --all, apply the overnight wrapper to the entire
-     multi-project run (not per project).
-  File: packages/cli/src/commands/__tests__/run-multi.test.ts
-  Tests (mock executeRun since we don't want to actually run Docker):
-  1. --all with 0 registered projects → prints "no projects" message.
-  2. --all with multiple projects → executeRun called once per project.
-  3. --all generates unique runId per project.
-  Use vi.mock to mock the executeRun function and verify call arguments.
-
-## T5: Enhanced run summary with per-project breakdown
+## T7: README.md with architecture diagram, quick start, and installation
 - STATUS: pending
-- FILES: packages/cli/src/commands/status.ts, packages/cli/src/engine/summary.ts
-- VERIFY: cd packages/cli && pnpm build && pnpm vitest run
+- FILES: README.md, LICENSE
+- VERIFY: cat README.md | head -5
+- CRITIC: review
+- PUSH: gate
+- SPEC: Create the README.md at the monorepo root and add MIT LICENSE.
+  File: LICENSE — Standard MIT license, copyright 2026 Eugene Orlov.
+  File: README.md — Structure it as follows:
+  Section 1: Header
+  - The owl ASCII art (same as brand.ts) centered
+  - "noxdev" as h1
+  - Tagline: "Ship code while you sleep" as subtitle
+  - Badges: npm version, license MIT, node >=18 (use shields.io badge URLs)
+  Section 2: What is noxdev (one paragraph)
+  An open-source Node.js CLI that orchestrates autonomous coding agents overnight.
+  Write task specs, go to sleep, wake up to real commits on production codebases.
+  Docker containment, git worktree isolation, and a morning review workflow keep
+  your main branch safe.
+  Section 3: Quick Start
+  ```bash
+  npm install -g noxdev
+  noxdev doctor                           # check prerequisites
+  noxdev init my-project --repo ~/my-repo # register a project
+  # write tasks in ~/worktrees/my-project/TASKS.md
+  noxdev run my-project                   # run task loop
+  noxdev status my-project                # morning summary
+  noxdev merge my-project                 # approve/reject commits
+  noxdev dashboard                        # visual review UI
+  ```
+  Section 4: Task Format
+  Show the TASKS.md format with one example task. Explain each field briefly:
+  STATUS, FILES, VERIFY, CRITIC, PUSH, SPEC. Show the three-tier push model
+  (auto/gate/manual) in a small table.
+  Section 5: Architecture
+  A mermaid diagram showing the flow:
+  TASKS.md → noxdev CLI → Docker container (Claude Code agent) → git commit →
+  morning review (CLI or dashboard) → merge to main.
+  Show the safety layers: Docker containment, worktree isolation, critic agent,
+  gated push, no auto-push ever.
+  Section 6: CLI Commands
+  A table of all commands with one-line descriptions (same as design doc section 4).
+  Section 7: The Morning Dashboard
+  Brief description + mention to run noxdev dashboard. Note it runs on localhost only.
+  Section 8: Safety Model
+  Bullet list: Docker containment (memory/CPU/timeout), git worktree (main always safe),
+  no auto-push ever, critic agent review, circuit breaker (3 failures → stop),
+  SOPS + age secrets encryption.
+  Section 9: Requirements
+  Node.js >= 18, Docker, Git, Claude CLI (claude login), SOPS + age (optional, for secrets).
+  Section 10: Built With
+  One line: "Built by a single developer using AI-augmented development."
+  Link to the Solo Dev Playbook (future).
+  Section 11: License
+  MIT. Link to LICENSE file.
+  Keep the tone technical, understated, no marketing fluff. Write it for the
+  Hacker News audience: they respect craft and distrust hype.
+
+## T8: CHANGELOG.md for v0.1.0 launch
+- STATUS: pending
+- FILES: CHANGELOG.md
+- VERIFY: cat CHANGELOG.md | head -5
 - CRITIC: skip
 - PUSH: auto
-- SPEC: Create a summary module and enhance the status command for multi-project views.
-  File: packages/cli/src/engine/summary.ts
-  Export interface ProjectSummary { projectId: string; displayName: string; runId: string | null;
-  status: string | null; total: number; completed: number; failed: number; skipped: number;
-  pendingMerge: number; startedAt: string | null; finishedAt: string | null; }
-  Export function getAllProjectSummaries(db: Database): ProjectSummary[]
-  For each project, query the latest run and compute summary stats.
-  Uses getAllProjects from db/queries.ts and getTaskResults for each run.
-  Export function formatSummaryTable(summaries: ProjectSummary[]): string
-  Returns a formatted table string using chalk:
-  ---
-  PROJECT              LAST RUN     STATUS        TASKS         MERGE
-  mit-nexus            2h ago       completed     10/10 ✓       3 pending
-  securatrack          5h ago       completed     8/10 (2 fail) 8 pending
-  agentic-research     never        —             —             —
-  ---
-  Color coding: all completed = green row, has failures = yellow, never run = dim.
-  File: packages/cli/src/commands/status.ts
-  Extend the status command:
-  1. When called with no project argument AND multiple projects are registered,
-     use formatSummaryTable to show the overview table first.
-  2. Then show detailed status for each project that has a recent run (last 24h).
-  3. When called with a specific project, show only that project's detailed status
-     (same as T1 behavior).
-  4. Add --summary flag that shows ONLY the table, no per-project detail.
-     Useful for quick morning glance.
-  This task builds on T1 — don't break the single-project status behavior.
-  Just add the multi-project overview when appropriate.
+- SPEC: Create CHANGELOG.md at the monorepo root following Keep a Changelog format.
+  File: CHANGELOG.md
+  ```markdown
+  # Changelog
+
+  All notable changes to noxdev will be documented in this file.
+  Format based on [Keep a Changelog](https://keepachangelog.com/).
+
+  ## [0.1.0] - 2026-03-XX
+
+  ### Added
+  - CLI commands: init, run, status, log, merge, projects, dashboard, doctor
+  - Multi-project orchestration with sequential execution (--all flag)
+  - Overnight unattended mode (--overnight flag)
+  - SQLite ledger for full execution history
+  - TASKS.md parser with multi-line SPEC support
+  - Docker containment with memory/CPU/timeout limits
+  - Git worktree isolation (main always safe)
+  - Two-agent workflow: developer agent + optional critic agent
+  - Max-first authentication (Claude Max free compute, API fallback)
+  - Three-tier push model: auto, gate, manual
+  - Circuit breaker: 3 consecutive failures pause project
+  - Interactive merge workflow (approve/reject per commit)
+  - React morning dashboard with diff viewer and merge review
+  - Dark/light theme toggle in dashboard
+  - noxdev doctor prerequisite checker
+  - SOPS + age secrets encryption support
+  - No auto-push, ever
+
+  ### Bootstrap
+  - noxdev built its own dashboard (Phase D) using the noxdev CLI
+  - 43/43 autonomous tasks completed across 5 build phases
+  ```
+  Replace the date XX with the actual publish date before release.

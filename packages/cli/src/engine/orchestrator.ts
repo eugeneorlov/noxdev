@@ -1,5 +1,5 @@
 import { execSync } from "node:child_process";
-import { writeFileSync, mkdirSync, unlinkSync, readFileSync } from "node:fs";
+import { writeFileSync, mkdirSync, unlinkSync, readFileSync, copyFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir, homedir } from "node:os";
 import chalk from "chalk";
@@ -83,6 +83,16 @@ export async function executeRun(ctx: RunContext): Promise<void> {
   const circuitBreakerThreshold = 3;
 
   let lastSha = commitBefore;
+
+  // Credential snapshot - save before any Docker containers can corrupt the original
+  const claudeJsonSrc = join(homedir(), '.claude.json');
+  const snapshotDir = join(homedir(), '.noxdev');
+  const claudeSnapshot = join(snapshotDir, '.claude-snapshot.json');
+  if (existsSync(claudeJsonSrc)) {
+    mkdirSync(snapshotDir, { recursive: true });
+    copyFileSync(claudeJsonSrc, claudeSnapshot);
+    console.log(chalk.dim('  Credential snapshot saved'));
+  }
 
   for (const task of pendingTasks) {
     // Circuit breaker check

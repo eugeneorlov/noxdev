@@ -19,6 +19,12 @@
 
 set -euo pipefail
 
+# Credential restore - restore from snapshot if it exists
+CRED_SNAPSHOT="$HOME/.noxdev/.claude-snapshot.json"
+if [ -f "$CRED_SNAPSHOT" ]; then
+  cp "$CRED_SNAPSHOT" "$HOME/.claude.json"
+fi
+
 if [ "$#" -ne 10 ]; then
   echo "Error: expected 10 arguments, got $#" >&2
   echo "Usage: docker-run-api.sh <prompt_file> <task_log> <timeout_seconds> <worktree_dir> <project_git_dir> <git_target_path> <memory_limit> <cpu_limit> <docker_image> <api_key>" >&2
