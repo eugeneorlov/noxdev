@@ -34,27 +34,18 @@ memory_limit="$7"
 cpu_limit="$8"
 docker_image="$9"
 
-# Backup .claude.json from host
-cp ~/.claude.json /tmp/.claude.json.bak
+HOST_UID=$(id -u)
+HOST_GID=$(id -g)
 
-docker run --rm \
-  --memory="$memory_limit" \
-  --cpus="$cpu_limit" \
-  -v "$worktree_dir":/workspace \
-  -v "$project_git_dir":/project-git:ro \
-  -v "$prompt_file":/tmp/prompt.md:ro \
-  -v /tmp/.claude.json.bak:/root/.claude.json \
-  --workdir /workspace \
-  "$docker_image" \
-  bash -c '
-    git config --global user.email "noxdev@local"
-    git config --global user.name "noxdev"
-    git config --global safe.directory /workspace
-    git config --global safe.directory /project-git
-    echo "gitdir: /project-git/worktrees/'"$(basename "$worktree_dir")"'" > /workspace/.git
-    timeout '"$timeout_seconds"' claude --print --verbose --output-format stream-json \
-      -p "$(cat /tmp/prompt.md)" \
-      --model claude-sonnet-4-20250514 \
-      --max-turns 30 \
-      --allowedTools "Bash(git*),Bash(npm*),Bash(pnpm*),Bash(node*),Bash(cat*),Bash(ls*),Bash(find*),Bash(grep*),Bash(sed*),Bash(mkdir*),Bash(cp*),Bash(mv*),Bash(rm*),Bash(echo*),Bash(touch*),Bash(head*),Bash(tail*),Read,Write,Edit"
-  ' > "$task_log" 2>&1
+timeout "$timeout_seconds" docker run --rm \
+    --memory="$memory_limit" \
+    --cpus="$cpu_limit" \
+    -v "$worktree_dir":/workspace \
+    -v "$project_git_dir":"$git_target_path" \
+    -v ~/.claude:/tmp/.claude \
+    -e HOME=/tmp \
+    --user "$HOST_UID":"$HOST_GID" \
+    -v "$prompt_file":/tmp/task-prompt.txt:ro \
+    "$docker_image" \
+    bash -c 'git config user.name "noxdev" && git config user.email "noxdev@local" && claude -p "$(cat /tmp/task-prompt.txt)" --dangerously-skip-permissions --model claude-sonnet-4-20250514 --effort high' \
+    > "$task_log" 2>&1

@@ -29,31 +29,25 @@ prompt_file="$1"
 task_log="$2"
 timeout_seconds="$3"
 worktree_dir="$4"
-# project_git_dir="$5"  # reserved
-# git_target_path="$6"  # reserved
+project_git_dir="$5"
+git_target_path="$6"
 memory_limit="$7"
 cpu_limit="$8"
 docker_image="$9"
 api_key="${10}"
 
-docker run --rm \
-  --memory="$memory_limit" \
-  --cpus="$cpu_limit" \
-  -v "$worktree_dir":/workspace \
-  -v "$project_git_dir":/project-git:ro \
-  -v "$prompt_file":/tmp/prompt.md:ro \
-  -e ANTHROPIC_API_KEY="$api_key" \
-  --workdir /workspace \
-  "$docker_image" \
-  bash -c '
-    git config --global user.email "noxdev@local"
-    git config --global user.name "noxdev"
-    git config --global safe.directory /workspace
-    git config --global safe.directory /project-git
-    echo "gitdir: /project-git/worktrees/'"$(basename "$worktree_dir")"'" > /workspace/.git
-    timeout '"$timeout_seconds"' claude --print --verbose --output-format stream-json \
-      -p "$(cat /tmp/prompt.md)" \
-      --model claude-sonnet-4-20250514 \
-      --max-turns 30 \
-      --allowedTools "Bash(git*),Bash(npm*),Bash(pnpm*),Bash(node*),Bash(cat*),Bash(ls*),Bash(find*),Bash(grep*),Bash(sed*),Bash(mkdir*),Bash(cp*),Bash(mv*),Bash(rm*),Bash(echo*),Bash(touch*),Bash(head*),Bash(tail*),Read,Write,Edit"
-  ' > "$task_log" 2>&1
+HOST_UID=$(id -u)
+HOST_GID=$(id -g)
+
+timeout "$timeout_seconds" docker run --rm \
+    --memory="$memory_limit" \
+    --cpus="$cpu_limit" \
+    -v "$worktree_dir":/workspace \
+    -v "$project_git_dir":"$git_target_path" \
+    -v "$prompt_file":/tmp/task-prompt.txt:ro \
+    -e ANTHROPIC_API_KEY="$api_key" \
+    -e HOME=/tmp \
+    --user "$HOST_UID":"$HOST_GID" \
+    "$docker_image" \
+    bash -c 'git config user.name "noxdev" && git config user.email "noxdev@local" && claude -p "$(cat /tmp/task-prompt.txt)" --dangerously-skip-permissions --model claude-sonnet-4-20250514 --effort high' \
+    > "$task_log" 2>&1
