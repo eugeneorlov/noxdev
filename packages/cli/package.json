@@ -2,7 +2,15 @@
   "name": "noxdev",
   "version": "0.1.0",
   "description": "Autonomous overnight coding agent orchestrator — ship code while you sleep",
-  "keywords": ["cli", "ai", "coding-agent", "docker", "autonomous", "claude", "devtools"],
+  "keywords": [
+    "cli",
+    "ai",
+    "coding-agent",
+    "docker",
+    "autonomous",
+    "claude",
+    "devtools"
+  ],
   "author": "Eugene Orlov",
   "license": "MIT",
   "repository": {
@@ -10,8 +18,15 @@
     "url": "https://github.com/eugeneorlov/noxdev"
   },
   "homepage": "https://github.com/eugeneorlov/noxdev",
-  "engines": { "node": ">=18.0.0" },
-  "files": ["dist/", "scripts/", "README.md", "LICENSE"],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "files": [
+    "dist/",
+    "scripts/",
+    "README.md",
+    "LICENSE"
+  ],
   "type": "module",
   "bin": {
     "noxdev": "./dist/index.js"
@@ -23,18 +38,20 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "commander": "^13.1.0",
     "better-sqlite3": "^11.8.1",
     "chalk": "^5.4.1",
-    "ora": "^8.2.0",
-    "express": "^4.21.2"
+    "commander": "^13.1.0",
+    "cors": "^2.8.6",
+    "express": "^4.21.2",
+    "ora": "^8.2.0"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.3",
+    "@types/node": "^22.13.10",
     "tsup": "^8.4.0",
     "typescript": "^5.7.3",
-    "@types/better-sqlite3": "^7.6.13",
-    "@types/node": "^22.13.10",
-    "@types/express": "^5.0.3",
     "vitest": "^3.0.9"
   }
 }

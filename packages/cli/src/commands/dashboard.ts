@@ -13,7 +13,7 @@ export function registerDashboard(program: Command): void {
     .option("--api-port <port>", "API port", "4400")
     .action(async (opts: { port: string; apiPort: string }) => {
       // Look for bundled dashboard first (npm global install), then monorepo path (dev)
-      const bundledDashboard = path.resolve(import.meta.dirname, '..', 'dashboard');
+      const bundledDashboard = path.resolve(import.meta.dirname, 'dashboard');
       const monorepoDevDashboard = path.resolve(import.meta.dirname, '..', '..', '..', 'packages', 'dashboard');
       const dashboardDir = existsSync(path.join(bundledDashboard, 'index.html'))
         ? bundledDashboard
@@ -33,18 +33,14 @@ export function registerDashboard(program: Command): void {
         console.log(`  Dashboard: http://localhost:${opts.apiPort}`);
         console.log("  Press Ctrl+C to stop");
 
-        const app = express();
-
         // Mount API routes first
-        // TODO: Add API routes here when they exist
-
-        // Serve static dashboard files for all other routes
+        const serverUrl = new URL(path.join(dashboardDir, 'api', 'server.js'), 'file://').href;
+        const { app } = await import(serverUrl);
         app.use(express.static(dashboardDir));
-
-        // Handle React Router - serve index.html for non-API routes
-        app.get('*', (req, res) => {
+        app.get('*', (req: any, res: any) => {
           res.sendFile(path.join(dashboardDir, 'index.html'));
         });
+
 
         const server = app.listen(parseInt(opts.apiPort), () => {
           console.log(chalk.green(`Dashboard running on http://localhost:${opts.apiPort}`));
