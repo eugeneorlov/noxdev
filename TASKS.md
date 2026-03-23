@@ -13,7 +13,7 @@
 # After T6 lands, test: npm pack && npm install -g noxdev-0.1.0.tgz && noxdev --help
 
 ## T1: Fix critic agent auth — credential snapshot before Docker runs
-- STATUS: pending
+- STATUS: done
 - FILES: packages/cli/src/commands/run.ts, packages/cli/scripts/docker-run-max.sh, packages/cli/scripts/docker-run-api.sh
 - VERIFY: pnpm build
 - CRITIC: skip
@@ -50,7 +50,7 @@
   Docker mount pattern, volume mounts, and Claude Code flags are battle-tested.
 
 ## T2: noxdev doctor — prerequisite checker command
-- STATUS: pending
+- STATUS: done
 - FILES: packages/cli/src/commands/doctor.ts, packages/cli/src/index.ts
 - VERIFY: pnpm build && node packages/cli/dist/index.js doctor
 - CRITIC: skip
@@ -86,7 +86,7 @@
   Exit code 1 if any critical check fails.
 
 ## T3: CLI ASCII art owl header and --version flag
-- STATUS: pending
+- STATUS: done
 - FILES: packages/cli/src/index.ts, packages/cli/src/brand.ts, packages/cli/package.json
 - VERIFY: pnpm build && node packages/cli/dist/index.js --version && node packages/cli/dist/index.js --help
 - CRITIC: skip
@@ -123,7 +123,7 @@
   Update packages/cli/package.json version to "0.1.0".
 
 ## T4: Dashboard dark/light theme toggle
-- STATUS: pending
+- STATUS: done
 - FILES: packages/dashboard/tailwind.config.ts, packages/dashboard/src/App.tsx, packages/dashboard/src/components/ThemeToggle.tsx, packages/dashboard/src/styles/globals.css
 - VERIFY: cd packages/dashboard && pnpm build
 - CRITIC: skip
@@ -175,7 +175,7 @@
   Don't miss the StatusBadge component (it needs dark-friendly colors too).
 
 ## T5: Dashboard owl logo and footer branding
-- STATUS: pending
+- STATUS: done
 - FILES: packages/dashboard/src/App.tsx, packages/dashboard/public/owl-logo.svg
 - VERIFY: cd packages/dashboard && pnpm build
 - CRITIC: skip
@@ -198,7 +198,7 @@
   3. Make sure the header logo + text link to the Overview page (/).
 
 ## T6: npm publish preparation — bundle dashboard, package metadata
-- STATUS: pending
+- STATUS: done
 - FILES: packages/cli/package.json, packages/cli/tsup.config.ts, packages/cli/src/commands/dashboard.ts
 - VERIFY: cd packages/cli && pnpm build && ls dist/dashboard/index.html && node dist/index.js dashboard --help
 - CRITIC: review
@@ -269,7 +269,7 @@
   dashboard dist into its own dist/).
 
 ## T7: README.md with architecture diagram, quick start, and installation
-- STATUS: pending
+- STATUS: done
 - FILES: README.md, LICENSE
 - VERIFY: cat README.md | head -5
 - CRITIC: review
@@ -327,7 +327,7 @@
   Hacker News audience: they respect craft and distrust hype.
 
 ## T8: CHANGELOG.md for v0.1.0 launch
-- STATUS: pending
+- STATUS: done
 - FILES: CHANGELOG.md
 - VERIFY: cat CHANGELOG.md | head -5
 - CRITIC: skip
