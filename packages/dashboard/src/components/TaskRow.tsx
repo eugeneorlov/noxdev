@@ -53,10 +53,10 @@ export function TaskRow({ task, runId }: TaskRowProps) {
 
   const getMergeDecisionBadge = (decision: string) => {
     const styles = {
-      pending: 'bg-gray-100 text-gray-800',
-      approved: 'bg-green-100 text-green-800',
-      rejected: 'bg-red-100 text-red-800',
-      merged: 'bg-blue-100 text-blue-800',
+      pending: 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200',
+      approved: 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200',
+      rejected: 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200',
+      merged: 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200',
     };
 
     return (
@@ -77,32 +77,32 @@ export function TaskRow({ task, runId }: TaskRowProps) {
   };
 
   return (
-    <div className="border-b py-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800">
+    <div className="border-b border-gray-200 dark:border-[var(--nox-border)] py-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800">
       {/* Collapsed View */}
       <div
         className="flex items-center gap-4 w-full"
         onClick={() => setIsExpanded(!isExpanded)}
       >
-        <div className="flex-shrink-0 w-16 text-sm font-mono text-gray-500">
+        <div className="flex-shrink-0 w-16 text-sm font-mono text-gray-500 dark:text-gray-400">
           {task.task_id}
         </div>
 
         <div className="flex-1 min-w-0">
-          <h3 className="font-medium text-sm truncate">{task.title}</h3>
+          <h3 className="font-medium text-sm truncate text-gray-900 dark:text-gray-100">{task.title}</h3>
         </div>
 
         <div className="flex items-center gap-3">
           <StatusBadge status={task.status} />
-          <span className="text-sm text-gray-600 font-mono">
+          <span className="text-sm text-gray-600 dark:text-gray-400 font-mono">
             {formatDuration(task.duration_seconds)}
           </span>
-          <span className="text-sm text-gray-600 font-mono">
+          <span className="text-sm text-gray-600 dark:text-gray-400 font-mono">
             {truncateCommitSha(task.commit_sha)}
           </span>
           {getMergeDecisionBadge(task.merge_decision)}
         </div>
 
-        <div className="flex-shrink-0 text-gray-400">
+        <div className="flex-shrink-0 text-gray-400 dark:text-gray-500">
           {isExpanded ? '▼' : '▶'}
         </div>
       </div>
@@ -112,14 +112,14 @@ export function TaskRow({ task, runId }: TaskRowProps) {
         <div className="mt-4 pl-20 pr-4 space-y-3 text-sm">
           {loading ? (
             <div className="flex items-center justify-center py-4">
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 dark:border-blue-400"></div>
             </div>
           ) : (
             <>
               {taskDetail?.task_spec && (
                 <div>
-                  <h4 className="font-medium text-gray-700 mb-2">Task Specification:</h4>
-                  <pre className="bg-gray-50 dark:bg-gray-900 p-3 rounded text-xs overflow-x-auto whitespace-pre-wrap">
+                  <h4 className="font-medium text-gray-700 dark:text-gray-300 mb-2">Task Specification:</h4>
+                  <pre className="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 p-3 rounded text-xs overflow-x-auto whitespace-pre-wrap">
                     {taskDetail.task_spec}
                   </pre>
                 </div>
@@ -127,10 +127,10 @@ export function TaskRow({ task, runId }: TaskRowProps) {
 
               {taskDetail?.files && (
                 <div>
-                  <h4 className="font-medium text-gray-700 mb-2">Files:</h4>
+                  <h4 className="font-medium text-gray-700 dark:text-gray-300 mb-2">Files:</h4>
                   <div className="bg-gray-50 dark:bg-gray-900 p-3 rounded">
                     {parseTaskFiles(taskDetail.files).map((file, index) => (
-                      <div key={index} className="text-xs font-mono text-gray-600">
+                      <div key={index} className="text-xs font-mono text-gray-600 dark:text-gray-400">
                         {file}
                       </div>
                     ))}
@@ -140,8 +140,8 @@ export function TaskRow({ task, runId }: TaskRowProps) {
 
               {taskDetail?.verify && (
                 <div>
-                  <h4 className="font-medium text-gray-700 mb-2">Verify Command:</h4>
-                  <code className="bg-gray-50 dark:bg-gray-900 px-2 py-1 rounded text-xs">
+                  <h4 className="font-medium text-gray-700 dark:text-gray-300 mb-2">Verify Command:</h4>
+                  <code className="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 px-2 py-1 rounded text-xs">
                     {taskDetail.verify}
                   </code>
                 </div>
@@ -150,7 +150,7 @@ export function TaskRow({ task, runId }: TaskRowProps) {
               <div className="pt-2">
                 <Link
                   to={`/runs/${runId}/tasks/${task.task_id}`}
-                  className="inline-flex items-center text-blue-600 hover:text-blue-800 text-sm font-medium"
+                  className="inline-flex items-center text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 text-sm font-medium"
                   onClick={(e) => e.stopPropagation()}
                 >
                   View full task details →

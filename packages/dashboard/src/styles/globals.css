@@ -6,4 +6,23 @@
   --nox-owl: #C9A84C;
   --nox-dark: #1a1a2e;
   --nox-accent: #16213e;
+  --nox-bg: #ffffff;
+  --nox-surface: #f9fafb;
+  --nox-text: #111827;
+  --nox-text-muted: #6b7280;
+  --nox-border: #e5e7eb;
+}
+
+.dark {
+  --nox-bg: #0f0f1a;
+  --nox-surface: #1a1a2e;
+  --nox-text: #e5e7eb;
+  --nox-text-muted: #9ca3af;
+  --nox-border: #2d2d44;
+  --nox-owl: #C9A84C;
+}
+
+body {
+  background-color: var(--nox-bg);
+  color: var(--nox-text);
 }

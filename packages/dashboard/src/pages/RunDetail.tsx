@@ -71,7 +71,7 @@ export default function RunDetail() {
   if (loading) {
     return (
       <div className="p-6 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 dark:border-blue-400"></div>
       </div>
     );
   }
@@ -79,8 +79,8 @@ export default function RunDetail() {
   if (error) {
     return (
       <div className="p-6">
-        <div className="bg-red-50 border border-red-200 rounded-md p-4">
-          <p className="text-red-800">Error: {error}</p>
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md p-4">
+          <p className="text-red-800 dark:text-red-200">Error: {error}</p>
         </div>
       </div>
     );
@@ -89,8 +89,8 @@ export default function RunDetail() {
   if (!run) {
     return (
       <div className="p-6">
-        <div className="bg-gray-50 border border-gray-200 rounded-md p-4">
-          <p className="text-gray-800">Run not found</p>
+        <div className="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md p-4">
+          <p className="text-gray-800 dark:text-gray-200">Run not found</p>
         </div>
       </div>
     );
@@ -104,7 +104,7 @@ export default function RunDetail() {
       <div className="mb-4">
         <Link
           to="/"
-          className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+          className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 text-sm font-medium"
         >
           ← Back to Overview
         </Link>
@@ -114,32 +114,32 @@ export default function RunDetail() {
       <div className="mb-8">
         <div className="flex items-start justify-between mb-4">
           <div>
-            <h1 className="text-3xl font-bold mb-2">
+            <h1 className="text-3xl font-bold mb-2 text-gray-900 dark:text-gray-100">
               {run.project_display_name}
             </h1>
-            <p className="text-gray-600 text-sm font-mono">Run ID: {run.id}</p>
+            <p className="text-gray-600 dark:text-gray-400 text-sm font-mono">Run ID: {run.id}</p>
           </div>
           <StatusBadge status={run.status} />
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 text-sm">
           <div>
-            <span className="text-gray-500">Started:</span>
-            <div className="font-mono">{formatDateTime(run.started_at)}</div>
+            <span className="text-gray-500 dark:text-gray-400">Started:</span>
+            <div className="font-mono text-gray-900 dark:text-gray-100">{formatDateTime(run.started_at)}</div>
           </div>
           {run.finished_at && (
             <div>
-              <span className="text-gray-500">Finished:</span>
-              <div className="font-mono">{formatDateTime(run.finished_at)}</div>
+              <span className="text-gray-500 dark:text-gray-400">Finished:</span>
+              <div className="font-mono text-gray-900 dark:text-gray-100">{formatDateTime(run.finished_at)}</div>
             </div>
           )}
           <div>
-            <span className="text-gray-500">Auth Mode:</span>
-            <div className="font-mono">{run.auth_mode}</div>
+            <span className="text-gray-500 dark:text-gray-400">Auth Mode:</span>
+            <div className="font-mono text-gray-900 dark:text-gray-100">{run.auth_mode}</div>
           </div>
           <div>
-            <span className="text-gray-500">Tasks:</span>
-            <div className="font-mono">
+            <span className="text-gray-500 dark:text-gray-400">Tasks:</span>
+            <div className="font-mono text-gray-900 dark:text-gray-100">
               {run.completed}/{run.total_tasks} completed
             </div>
           </div>
@@ -154,12 +154,12 @@ export default function RunDetail() {
             <div className="text-red-600 font-medium">
               {run.failed} failed
             </div>
-            <div className="text-gray-500 font-medium">
+            <div className="text-gray-500 dark:text-gray-400 font-medium">
               {run.skipped} skipped
             </div>
           </div>
 
-          <div className="flex h-2 bg-gray-200 rounded-full overflow-hidden">
+          <div className="flex h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
             {summaryBar.completed > 0 && (
               <div
                 className="bg-green-500"
@@ -183,18 +183,18 @@ export default function RunDetail() {
       </div>
 
       {/* Task List */}
-      <div className="bg-white rounded-lg border shadow-sm">
-        <div className="px-4 py-3 border-b bg-gray-50">
-          <h2 className="font-semibold text-lg">Tasks</h2>
+      <div className="bg-white dark:bg-[var(--nox-surface)] rounded-lg border border-gray-200 dark:border-[var(--nox-border)] shadow-sm">
+        <div className="px-4 py-3 border-b border-gray-200 dark:border-[var(--nox-border)] bg-gray-50 dark:bg-gray-800">
+          <h2 className="font-semibold text-lg text-gray-900 dark:text-gray-100">Tasks</h2>
         </div>
 
-        <div className="divide-y">
+        <div className="divide-y divide-gray-200 dark:divide-[var(--nox-border)]">
           {run.task_results && run.task_results.length > 0 ? (
             run.task_results.map((task) => (
               <TaskRow key={task.id} task={task} runId={run.id} />
             ))
           ) : (
-            <div className="p-6 text-center text-gray-500">
+            <div className="p-6 text-center text-gray-500 dark:text-gray-400">
               No tasks found for this run
             </div>
           )}

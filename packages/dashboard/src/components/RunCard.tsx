@@ -38,9 +38,9 @@ export function RunCard({ project }: RunCardProps) {
   const hasRun = !!project.last_run_id;
 
   return (
-    <div className="rounded-lg border shadow-sm p-4 hover:shadow-md transition">
+    <div className="rounded-lg border border-gray-200 dark:border-[var(--nox-border)] bg-white dark:bg-[var(--nox-surface)] shadow-sm p-4 hover:shadow-md transition">
       <div className="flex items-start justify-between mb-3">
-        <h3 className="font-semibold text-lg">{displayName}</h3>
+        <h3 className="font-semibold text-lg text-gray-900 dark:text-gray-100">{displayName}</h3>
         {hasRun && project.last_run_status && (
           <StatusBadge status={project.last_run_status} />
         )}
@@ -48,7 +48,7 @@ export function RunCard({ project }: RunCardProps) {
 
       {hasRun ? (
         <div className="space-y-2">
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-gray-600 dark:text-gray-400">
             Last run: {formatRelativeTime(project.last_run_at!)}
           </p>
 
@@ -59,20 +59,20 @@ export function RunCard({ project }: RunCardProps) {
             <span className="text-red-600">
               {project.failed || 0} failed
             </span>
-            <span className="text-gray-500">
+            <span className="text-gray-500 dark:text-gray-400">
               {project.total_tasks || 0} total
             </span>
           </div>
 
           <Link
             to={`/runs/${project.last_run_id}`}
-            className="inline-block mt-3 text-blue-600 hover:text-blue-800 text-sm font-medium"
+            className="inline-block mt-3 text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 text-sm font-medium"
           >
             View run details →
           </Link>
         </div>
       ) : (
-        <p className="text-gray-500 text-sm">No runs yet</p>
+        <p className="text-gray-500 dark:text-gray-400 text-sm">No runs yet</p>
       )}
     </div>
   );
