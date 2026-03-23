@@ -21,10 +21,10 @@ export default function Layout({ children }: LayoutProps) {
       <header className="border-b border-gray-200 dark:border-[var(--nox-border)] bg-white dark:bg-[var(--nox-surface)]">
         <div className="max-w-6xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <span className="text-2xl">🦉</span>
+            <Link to="/" className="flex items-center space-x-4 hover:opacity-80 transition-opacity">
+              <img src="/owl-logo.svg" alt="noxdev owl logo" className="h-7" />
               <span className="text-xl font-bold text-gray-900 dark:text-gray-100">noxdev</span>
-            </div>
+            </Link>
             <nav className="flex items-center space-x-6">
               <Link to="/" className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100">
                 Overview
@@ -49,7 +49,7 @@ export default function Layout({ children }: LayoutProps) {
       <footer className="border-t border-gray-200 dark:border-[var(--nox-border)] bg-gray-50 dark:bg-[var(--nox-surface)]">
         <div className="max-w-6xl mx-auto px-4 py-4">
           <p className="text-sm text-gray-500 dark:text-gray-400 text-center">
-            noxdev — ship code while you sleep
+            <span className="text-base">🦉</span> <span style={{ color: 'var(--nox-owl)' }}>noxdev</span> — ship code while you sleep
           </p>
         </div>
       </footer>

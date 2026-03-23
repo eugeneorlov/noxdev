@@ -1,0 +1,25 @@
+<svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+  <!-- Owl head (main circle) -->
+  <circle cx="16" cy="16" r="14" fill="none" stroke="#1a1a2e" stroke-width="1.5"/>
+
+  <!-- Ear tufts -->
+  <path d="M8 6 L10 2 L12 6" fill="none" stroke="#1a1a2e" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M20 6 L22 2 L24 6" fill="none" stroke="#1a1a2e" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Left eye outer circle -->
+  <circle cx="11" cy="14" r="5" fill="none" stroke="#1a1a2e" stroke-width="1.2"/>
+  <!-- Left eye iris -->
+  <circle cx="11" cy="14" r="3" fill="#C9A84C"/>
+  <!-- Left eye pupil -->
+  <circle cx="11" cy="14" r="1.5" fill="#1a1a2e"/>
+
+  <!-- Right eye outer circle -->
+  <circle cx="21" cy="14" r="5" fill="none" stroke="#1a1a2e" stroke-width="1.2"/>
+  <!-- Right eye iris -->
+  <circle cx="21" cy="14" r="3" fill="#C9A84C"/>
+  <!-- Right eye pupil -->
+  <circle cx="21" cy="14" r="1.5" fill="#1a1a2e"/>
+
+  <!-- Beak -->
+  <path d="M16 20 L14 24 L18 24 Z" fill="#1a1a2e"/>
+</svg>
