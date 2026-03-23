@@ -4,6 +4,7 @@ import { existsSync } from 'node:fs';
 import { access, constants } from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
+import apiRoutes from './routes/index.js';
 
 const app = express();
 const PORT = 4400;
@@ -40,8 +41,8 @@ app.get('/api/health', async (req, res) => {
   });
 });
 
-// Mount API routes at /api (routes will be defined in T2)
-// app.use('/api', apiRoutes);
+// Mount API routes at /api
+app.use('/api', apiRoutes);
 
 export { app };
 
