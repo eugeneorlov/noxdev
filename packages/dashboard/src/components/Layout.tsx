@@ -29,9 +29,6 @@ export default function Layout({ children }: LayoutProps) {
               <Link to="/" className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100">
                 Overview
               </Link>
-              <Link to="/projects" className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100">
-                Projects
-              </Link>
               <ThemeToggle />
             </nav>
           </div>
