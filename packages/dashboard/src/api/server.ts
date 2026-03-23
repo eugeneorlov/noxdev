@@ -7,7 +7,7 @@ import os from 'node:os';
 import apiRoutes from './routes/index.js';
 
 const app = express();
-const PORT = 4400;
+const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 4400;
 
 // Enable CORS for localhost origins
 app.use(cors({
