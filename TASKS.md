@@ -9,7 +9,7 @@
 # Session 4: T8, T9 (integration — orchestrator, overnight mode)
 
 ## T1: TASKS.md parser with multi-line SPEC support
-- STATUS: pending
+- STATUS: done
 - FILES: packages/cli/src/parser/tasks.ts, packages/cli/src/parser/__tests__/tasks.test.ts
 - VERIFY: cd packages/cli && pnpm build && pnpm vitest run src/parser/__tests__/tasks.test.ts
 - CRITIC: review
@@ -44,7 +44,7 @@
   Ensure vitest config works with TypeScript (vitest should auto-detect tsconfig).
 
 ## T2: SQLite query layer for run engine
-- STATUS: pending
+- STATUS: done
 - FILES: packages/cli/src/db/queries.ts, packages/cli/src/db/__tests__/queries.test.ts
 - VERIFY: cd packages/cli && pnpm build && pnpm vitest run src/db/__tests__/queries.test.ts
 - CRITIC: review
