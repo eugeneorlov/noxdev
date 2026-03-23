@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { Express } from 'express';
 import cors from 'cors';
 import { existsSync } from 'node:fs';
 import { access, constants } from 'node:fs/promises';
@@ -6,7 +6,7 @@ import path from 'node:path';
 import os from 'node:os';
 import apiRoutes from './routes/index.js';
 
-const app = express();
+const app: Express = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 4400;
 
 // Enable CORS for localhost origins

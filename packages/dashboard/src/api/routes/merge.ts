@@ -1,55 +1,8 @@
 import { Router } from 'express';
 import { getDb } from '../db.js';
 
-const router = Router();
+const router: Router = Router();
 
-// POST /api/runs/:id/tasks/:taskId/merge — body: { decision: 'approved' | 'rejected' }
-router.post('/runs/:id/tasks/:taskId/merge', (req, res) => {
-  try {
-    const db = getDb();
-    const runId = req.params.id;
-    const taskId = req.params.taskId;
-    const { decision } = req.body;
-
-    // Validate decision
-    if (!decision || !['approved', 'rejected'].includes(decision)) {
-      return res.status(400).json({ error: 'Decision must be either "approved" or "rejected"' });
-    }
-
-    // Check if task exists
-    const checkQuery = `
-      SELECT id FROM task_results
-      WHERE run_id = ? AND task_id = ?
-    `;
-    const existingTask = db.prepare(checkQuery).get(runId, taskId);
-
-    if (!existingTask) {
-      return res.status(404).json({ error: 'Task not found' });
-    }
-
-    // Update merge decision
-    const updateQuery = `
-      UPDATE task_results
-      SET merge_decision = ?, merged_at = datetime('now')
-      WHERE run_id = ? AND task_id = ?
-    `;
-
-    const result = db.prepare(updateQuery).run(decision, runId, taskId);
-
-    if (result.changes === 0) {
-      return res.status(404).json({ error: 'Task not found or no changes made' });
-    }
-
-    res.json({
-      success: true,
-      taskId,
-      decision
-    });
-  } catch (error) {
-    console.error('Error updating merge decision:', error);
-    res.status(500).json({ error: 'Failed to update merge decision' });
-  }
-});
 
 // POST /api/merge/:projectId — executes merge for all approved tasks
 router.post('/:projectId', (req, res) => {

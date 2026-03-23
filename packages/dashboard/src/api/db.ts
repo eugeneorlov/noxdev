@@ -6,7 +6,7 @@ export function getDb(): Database.Database {
   const dbPath = path.join(os.homedir(), '.noxdev', 'ledger.db');
 
   return new Database(dbPath, {
-    readonly: true,
+    readonly: false,
     fileMustExist: false
   });
 }

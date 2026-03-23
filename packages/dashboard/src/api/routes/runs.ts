@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { readFileSync } from 'node:fs';
 import { getDb } from '../db.js';
 
-const router = Router();
+const router: Router = Router();
 
 // GET /api/runs — returns all runs, newest first, limit 50
 router.get('/', (req, res) => {
@@ -84,12 +84,12 @@ router.get('/:id/tasks/:taskId', (req, res) => {
 
     // Read diff file if it exists
     let diff = null;
-    if (taskResult.diff_file) {
+    if ((taskResult as any).diff_file) {
       try {
-        diff = readFileSync(taskResult.diff_file, 'utf-8');
+        diff = readFileSync((taskResult as any).diff_file, 'utf-8');
       } catch (error) {
         // File doesn't exist or can't be read, diff stays null
-        console.warn(`Could not read diff file: ${taskResult.diff_file}`, error);
+        console.warn(`Could not read diff file: ${(taskResult as any).diff_file}`, error);
       }
     }
 
@@ -118,12 +118,12 @@ router.get('/:id/tasks/:taskId/diff', (req, res) => {
 
     const result = db.prepare(query).get(runId, taskId);
 
-    if (!result || !result.diff_file) {
+    if (!result || !(result as any).diff_file) {
       return res.status(404).json({ error: 'No diff available for this task' });
     }
 
     try {
-      const diffContent = readFileSync(result.diff_file, 'utf-8');
+      const diffContent = readFileSync((result as any).diff_file, 'utf-8');
       res.setHeader('Content-Type', 'text/plain');
       res.send(diffContent);
     } catch (error) {
@@ -133,6 +133,54 @@ router.get('/:id/tasks/:taskId/diff', (req, res) => {
   } catch (error) {
     console.error('Error fetching diff:', error);
     res.status(500).json({ error: 'Failed to fetch diff' });
+  }
+});
+
+// POST /api/runs/:id/tasks/:taskId/merge — body: { decision: 'approved' | 'rejected' }
+router.post('/:id/tasks/:taskId/merge', (req, res) => {
+  try {
+    const db = getDb();
+    const runId = req.params.id;
+    const taskId = req.params.taskId;
+    const { decision } = req.body;
+
+    // Validate decision
+    if (!decision || !['approved', 'rejected'].includes(decision)) {
+      return res.status(400).json({ error: 'Decision must be either "approved" or "rejected"' });
+    }
+
+    // Check if task exists
+    const checkQuery = `
+      SELECT id FROM task_results
+      WHERE run_id = ? AND task_id = ?
+    `;
+    const existingTask = db.prepare(checkQuery).get(runId, taskId);
+
+    if (!existingTask) {
+      return res.status(404).json({ error: 'Task not found' });
+    }
+
+    // Update merge decision
+    const updateQuery = `
+      UPDATE task_results
+      SET merge_decision = ?, merged_at = datetime('now')
+      WHERE run_id = ? AND task_id = ?
+    `;
+
+    const result = db.prepare(updateQuery).run(decision, runId, taskId);
+
+    if (result.changes === 0) {
+      return res.status(404).json({ error: 'Task not found or no changes made' });
+    }
+
+    res.json({
+      success: true,
+      taskId,
+      decision
+    });
+  } catch (error) {
+    console.error('Error updating merge decision:', error);
+    res.status(500).json({ error: 'Failed to update merge decision' });
   }
 });
 

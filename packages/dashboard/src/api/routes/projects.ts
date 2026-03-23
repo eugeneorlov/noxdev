@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { getDb } from '../db.js';
 
-const router = Router();
+const router: Router = Router();
 
 // GET /api/projects — returns all projects with their latest run info
 router.get('/', (req, res) => {

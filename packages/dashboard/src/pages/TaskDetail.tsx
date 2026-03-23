@@ -139,7 +139,7 @@ export default function TaskDetail() {
     );
   }
 
-  const taskFiles = parseTaskFiles(task.files);
+  const taskFiles = parseTaskFiles(task.files || null);
 
   return (
     <div className="p-6">
