@@ -279,7 +279,7 @@
   Runs: docker images -q {imageName} and returns true if output is non-empty.
 
 ## T7: TASKS.md status auto-updater
-- STATUS: pending
+- STATUS: done
 - FILES: packages/cli/src/parser/status-update.ts, packages/cli/src/parser/__tests__/status-update.test.ts
 - VERIFY: cd packages/cli && pnpm build && pnpm vitest run src/parser/__tests__/status-update.test.ts
 - CRITIC: skip
@@ -307,7 +307,7 @@
   Use node:fs to create temp files in os.tmpdir() for testing, clean up in afterEach.
 
 ## T8: Run engine orchestrator
-- STATUS: pending
+- STATUS: done
 - FILES: packages/cli/src/commands/run.ts, packages/cli/src/engine/orchestrator.ts, packages/cli/src/engine/types.ts
 - VERIFY: cd packages/cli && pnpm build && node dist/index.js run --help
 - CRITIC: review
