@@ -51,7 +51,7 @@
   (import runMigrations, insertRun, insertTaskResult, etc.).
 
 ## T2: Implement noxdev log command
-- STATUS: pending
+- STATUS: done
 - FILES: packages/cli/src/commands/log.ts, packages/cli/src/commands/__tests__/log.test.ts
 - VERIFY: cd packages/cli && pnpm build && pnpm vitest run src/commands/__tests__/log.test.ts
 - CRITIC: skip
