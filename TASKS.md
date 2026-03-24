@@ -1,44 +1,37 @@
-# noxdev Fix: Auto-sync worktree before run
+# noxdev: Version bump to v1.0.0
 
-## T1: Merge base branch into worktree at start of noxdev run
+## T1: Bump version to 1.0.0 across the monorepo
 - STATUS: done
-- FILES: packages/cli/src/commands/run.ts, packages/cli/src/db/schema.sql
-- VERIFY: pnpm build
+- FILES: packages/cli/package.json, packages/dashboard/package.json, package.json, CHANGELOG.md
+- VERIFY: pnpm build && node packages/cli/dist/index.js --version 2>&1 | grep -q "1.0.0"
 - CRITIC: skip
 - PUSH: auto
-- SPEC: Before running any tasks, noxdev run should sync the worktree with
-  the project's base branch (main/master) so agents always work on current code.
-  In packages/cli/src/commands/run.ts, add a sync step AFTER loading the
-  project config but BEFORE the task loop starts:
-  ```typescript
-  // Sync worktree with base branch before running tasks
-  try {
-    const baseBranch = execSync('git symbolic-ref --short HEAD', {
-      cwd: project.repo_path,
-      encoding: 'utf-8'
-    }).trim();
-    execSync(`git merge ${baseBranch} --no-edit`, {
-      cwd: project.worktree_path,
-      stdio: 'pipe'
-    });
-    console.log(chalk.gray(`  ✓ Worktree synced with ${baseBranch}`));
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    if (msg.includes('CONFLICT')) {
-      console.error(chalk.red('✖ Merge conflict syncing worktree with base branch.'));
-      console.error(chalk.gray('  Resolve manually: cd ' + project.worktree_path));
-      console.error(chalk.gray('  Then re-run: noxdev run ' + project.id));
-      process.exit(1);
-    }
-    // If merge fails for other reasons (already up to date, etc), continue
-    console.log(chalk.gray('  ✓ Worktree up to date'));
-  }
-  ```
-  This runs git symbolic-ref on the REPO (not the worktree) to get the
-  base branch name, then merges it into the worktree. If there's a merge
-  conflict, it stops with a clear error instead of running tasks on
-  conflicted code. If the merge is clean or already up to date, it continues.
-  Import execSync from 'node:child_process' if not already imported.
-  Place this step right after the "Starting run" log line but before
-  parsing TASKS.md.
-  Do NOT change any other run logic.
+- SPEC: Bump the version from 0.1.0 to 1.0.0 across all package.json files.
+  1. In packages/cli/package.json: change "version": "0.1.0" to "version": "1.0.0"
+  2. In packages/dashboard/package.json: change "version": "0.1.0" to "version": "1.0.0"
+  3. In the root package.json: change "version": "0.1.0" to "version": "1.0.0"
+  4. In CHANGELOG.md: add a new section at the top:
+     ```
+     ## [1.0.0] - 2026-03-24
+
+     ### Added
+     - Multi-project orchestration with `noxdev run --all`
+     - Interactive merge workflow with `noxdev merge`
+     - React morning dashboard with dark mode
+     - SQLite ledger for full execution history
+     - `noxdev doctor` prerequisite checker (9/9 checks)
+     - `noxdev remove` command for project cleanup
+     - Auto-sync worktree with base branch before runs
+     - Auto-commit TASKS.md status updates after runs
+     - Auto-create initial commit for empty repos during init
+     - Default branch detection (main/master/custom)
+     - Diff capture includes untracked files for critic review
+     - Credential snapshot restore before each Docker launch
+
+     ### Fixed
+     - Merge badge UX: hidden for auto-push, prefixed for gate tasks
+     - Approve/Reject buttons: help text clarifying CLI merge required
+     - noxdev projects: reads TASKS.md from worktree, not repo
+     - Turbo build order: dashboard builds before CLI
+     ```
+  Do NOT change any other fields in package.json files.
