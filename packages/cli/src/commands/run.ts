@@ -75,6 +75,29 @@ async function runProject(project: ProjectRow): Promise<void> {
   const runId = generateRunId();
   const gitDir = join(project.repo_path, ".git");
 
+  // Sync worktree with base branch before running tasks
+  try {
+    const baseBranch = execSync('git symbolic-ref --short HEAD', {
+      cwd: project.repo_path,
+      encoding: 'utf-8'
+    }).trim();
+    execSync(`git merge ${baseBranch} --no-edit`, {
+      cwd: project.worktree_path,
+      stdio: 'pipe'
+    });
+    console.log(chalk.gray(`  ✓ Worktree synced with ${baseBranch}`));
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes('CONFLICT')) {
+      console.error(chalk.red('✖ Merge conflict syncing worktree with base branch.'));
+      console.error(chalk.gray('  Resolve manually: cd ' + project.worktree_path));
+      console.error(chalk.gray('  Then re-run: noxdev run ' + project.id));
+      process.exit(1);
+    }
+    // If merge fails for other reasons (already up to date, etc), continue
+    console.log(chalk.gray('  ✓ Worktree up to date'));
+  }
+
   const ctx: RunContext = {
     projectId: project.id,
     projectConfig,
