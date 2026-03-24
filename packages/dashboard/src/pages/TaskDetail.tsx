@@ -242,21 +242,26 @@ export default function TaskDetail() {
               </div>
 
               {task.merge_decision === 'pending' && (
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => handleMergeDecision('approved')}
-                    disabled={updating}
-                    className="px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700 disabled:opacity-50"
-                  >
-                    {updating ? 'Updating...' : 'Approve'}
-                  </button>
-                  <button
-                    onClick={() => handleMergeDecision('rejected')}
-                    disabled={updating}
-                    className="px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700 disabled:opacity-50"
-                  >
-                    {updating ? 'Updating...' : 'Reject'}
-                  </button>
+                <div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleMergeDecision('approved')}
+                      disabled={updating}
+                      className="px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700 disabled:opacity-50"
+                    >
+                      {updating ? 'Updating...' : 'Approve'}
+                    </button>
+                    <button
+                      onClick={() => handleMergeDecision('rejected')}
+                      disabled={updating}
+                      className="px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700 disabled:opacity-50"
+                    >
+                      {updating ? 'Updating...' : 'Reject'}
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
+                    Records your decision. Run <code className="bg-gray-100 dark:bg-gray-800 px-1 rounded">noxdev merge</code> in terminal to execute.
+                  </p>
                 </div>
               )}
             </div>
