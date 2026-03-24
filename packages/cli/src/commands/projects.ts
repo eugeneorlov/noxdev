@@ -8,6 +8,7 @@ interface ProjectRow {
   id: string;
   display_name: string;
   repo_path: string;
+  worktree_path: string;
   started_at: string | null;
   completed: number | null;
   failed: number | null;
@@ -54,7 +55,7 @@ export function registerProjects(program: Command): void {
 
         const rows = db
           .prepare(
-            `SELECT p.id, p.display_name, p.repo_path,
+            `SELECT p.id, p.display_name, p.repo_path, p.worktree_path,
                     r.started_at, r.completed, r.failed, r.status AS run_status
              FROM projects p
              LEFT JOIN runs r ON r.id = (
@@ -100,7 +101,7 @@ export function registerProjects(program: Command): void {
             statusCol = pad("-", 20);
           }
 
-          const pending = countPendingTasks(row.repo_path);
+          const pending = countPendingTasks(row.worktree_path);
           const tasksCol = pending >= 0 ? String(pending) : "-";
 
           console.log(`${project}${lastRunCol}${statusCol}${tasksCol}`);
