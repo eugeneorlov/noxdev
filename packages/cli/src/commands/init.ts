@@ -82,6 +82,16 @@ async function runInit(project: string, repoPath: string): Promise<void> {
   }
   console.log(chalk.green("✓") + " Repository validated: " + resolvedRepo);
 
+  // Check if repository has any commits
+  try {
+    execSync('git rev-parse HEAD', { cwd: resolvedRepo, stdio: 'pipe' });
+  } catch {
+    console.error(chalk.red('✖ Repository has no commits.'));
+    console.error(chalk.gray('  Make an initial commit first:'));
+    console.error(chalk.gray('  git add . && git commit -m "init"'));
+    process.exit(1);
+  }
+
   // 2. Create git worktree
   const spinnerWt = ora("Creating git worktree…").start();
   try {
