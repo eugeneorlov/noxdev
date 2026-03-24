@@ -25,6 +25,17 @@ function isoNow(): string {
 }
 
 export async function executeRun(ctx: RunContext): Promise<void> {
+  // Credential paths - defined as constants at the top
+  const claudeJsonSrc = join(homedir(), '.claude.json');
+  const claudeSnapshot = join(homedir(), '.noxdev', '.claude-snapshot.json');
+
+  // Create credential snapshot ONCE at the very start before any Docker containers
+  if (existsSync(claudeJsonSrc)) {
+    mkdirSync(join(homedir(), '.noxdev'), { recursive: true });
+    copyFileSync(claudeJsonSrc, claudeSnapshot);
+    console.log(chalk.dim('  Credential snapshot saved'));
+  }
+
   const tasksFile = join(ctx.worktreeDir, ctx.projectConfig.tasks_file);
   const pendingTasks = parseTasksFromFile(tasksFile);
 
@@ -84,16 +95,6 @@ export async function executeRun(ctx: RunContext): Promise<void> {
 
   let lastSha = commitBefore;
 
-  // Credential snapshot - save before any Docker containers can corrupt the original
-  const claudeJsonSrc = join(homedir(), '.claude.json');
-  const snapshotDir = join(homedir(), '.noxdev');
-  const claudeSnapshot = join(snapshotDir, '.claude-snapshot.json');
-  if (existsSync(claudeJsonSrc)) {
-    mkdirSync(snapshotDir, { recursive: true });
-    copyFileSync(claudeJsonSrc, claudeSnapshot);
-    console.log(chalk.dim('  Credential snapshot saved'));
-  }
-
   for (const task of pendingTasks) {
     // Circuit breaker check
     if (consecutiveFailures >= circuitBreakerThreshold) {
@@ -106,7 +107,7 @@ export async function executeRun(ctx: RunContext): Promise<void> {
       break;
     }
 
-    const result = await executeTask(ctx, task, lastSha, logDir, 1, maxRetries);
+    const result = await executeTask(ctx, task, lastSha, logDir, 1, maxRetries, claudeJsonSrc, claudeSnapshot);
 
     // Update lastSha if commit happened
     if (result.commitSha) {
@@ -166,6 +167,8 @@ async function executeTask(
   logDir: string,
   attempt: number,
   maxRetries: number,
+  claudeJsonSrc: string,
+  claudeSnapshot: string,
   previousError?: string,
 ): Promise<TaskExecResult> {
   // Print task header
@@ -198,6 +201,11 @@ async function executeTask(
   const taskLogDir = join(logDir, task.taskId);
   mkdirSync(taskLogDir, { recursive: true });
   const taskLog = join(taskLogDir, `attempt-${attempt}.log`);
+
+  // Restore credential snapshot before Docker launch
+  if (existsSync(claudeSnapshot)) {
+    copyFileSync(claudeSnapshot, claudeJsonSrc);
+  }
 
   // Run task in Docker
   const timeoutSeconds = ctx.projectConfig.docker.timeout_minutes * 60;
@@ -259,6 +267,8 @@ async function executeTask(
       logDir,
       attempt + 1,
       maxRetries,
+      claudeJsonSrc,
+      claudeSnapshot,
       errorContext,
     );
   }
@@ -268,7 +278,7 @@ async function executeTask(
   let diffFile: string | null = null;
 
   if (task.critic === "review" && status === "COMPLETED") {
-    const criticResult = await runCritic(ctx, task, logDir, attempt);
+    const criticResult = await runCritic(ctx, task, logDir, attempt, claudeJsonSrc, claudeSnapshot);
     criticLogFile = criticResult.criticLogFile;
     diffFile = criticResult.diffFile;
 
@@ -290,6 +300,8 @@ async function executeTask(
           logDir,
           attempt + 1,
           maxRetries,
+          claudeJsonSrc,
+          claudeSnapshot,
           `Critic rejected the changes: ${criticResult.reason}`,
         );
       }
@@ -354,6 +366,8 @@ async function runCritic(
   task: ParsedTask,
   logDir: string,
   attempt: number,
+  claudeJsonSrc: string,
+  claudeSnapshot: string,
 ): Promise<{
   rejected: boolean;
   reason: string;
@@ -382,6 +396,11 @@ async function runCritic(
     `noxdev-critic-${ctx.runId}-${task.taskId}.md`,
   );
   writeFileSync(criticPromptFile, criticPromptContent, "utf-8");
+
+  // Restore credential snapshot before Docker launch
+  if (existsSync(claudeSnapshot)) {
+    copyFileSync(claudeSnapshot, claudeJsonSrc);
+  }
 
   // Run critic in Docker with shorter timeout (120s)
   const criticLog = join(taskLogDir, `critic-attempt-${attempt}.log`);

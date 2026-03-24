@@ -29,8 +29,14 @@ router.get('/:id', (req, res) => {
     const db = getDb();
     const projectId = req.params.id;
 
-    // Get project info
-    const projectQuery = `SELECT * FROM projects WHERE id = ?`;
+    // Get project info with last run
+    const projectQuery = `
+      SELECT p.*, r.id as last_run_id
+      FROM projects p
+      LEFT JOIN runs r ON p.id = r.project_id
+        AND r.started_at = (SELECT MAX(started_at) FROM runs WHERE project_id = p.id)
+      WHERE p.id = ?
+    `;
     const project = db.prepare(projectQuery).get(projectId);
 
     if (!project) {
