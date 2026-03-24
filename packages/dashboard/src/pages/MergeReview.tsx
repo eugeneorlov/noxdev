@@ -110,7 +110,7 @@ export default function MergeReview() {
         throw new Error(`Failed to fetch diff: ${response.status}`);
       }
       const data = await response.json();
-      setTaskDiffs(prev => ({ ...prev, [taskId]: data.diff || '' }));
+      setTaskDiffs(prev => ({ ...prev, [taskId]: data.diff }));
     } catch (error) {
       console.error('Error fetching diff:', error);
       setTaskDiffs(prev => ({ ...prev, [taskId]: 'Error loading diff' }));
@@ -364,8 +364,12 @@ export default function MergeReview() {
                     <div className="flex items-center justify-center py-4">
                       <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
                     </div>
+                  ) : taskDiffs[task.task_id] ? (
+                    <DiffViewer diff={taskDiffs[task.task_id]} />
                   ) : (
-                    <DiffViewer diff={taskDiffs[task.task_id] || ''} />
+                    <div className="text-gray-400 italic p-4">
+                      No diff available for this task.
+                    </div>
                   )}
                 </div>
               )}
