@@ -1,34 +1,54 @@
-# noxdev Fix: Auto-commit TASKS.md after run
+# noxdev Fix: Add remove command
 
-## T1: Auto-commit TASKS.md status updates after noxdev run completes
+## T1: Add noxdev remove command to unregister projects
 - STATUS: done
-- FILES: packages/cli/src/commands/run.ts
-- VERIFY: pnpm build
+- FILES: packages/cli/src/commands/remove.ts, packages/cli/src/index.ts
+- VERIFY: pnpm build && node packages/cli/dist/index.js remove --help
 - CRITIC: skip
 - PUSH: auto
-- SPEC: After noxdev run finishes all tasks (or hits circuit breaker), TASKS.md
-  has been modified with status updates (pending → done/failed) but is left
-  as an unstaged change. This requires a manual git add + commit before merging.
-  Fix: at the END of the run command, after the summary is printed and all
-  tasks are complete, add an auto-commit of TASKS.md on the worktree branch.
-  In packages/cli/src/commands/run.ts, find the section after the task loop
-  completes (after the summary/status output). Add:
-  ```typescript
-  // Auto-commit TASKS.md status updates
-  try {
-    const worktreePath = project.worktree_path;
-    execSync('git add TASKS.md', { cwd: worktreePath, stdio: 'pipe' });
-    execSync('git commit -m "noxdev: update task statuses"', { cwd: worktreePath, stdio: 'pipe' });
-    console.log(chalk.gray('  ✓ TASKS.md status updates committed'));
-  } catch {
-    // Silently ignore — TASKS.md might not exist or have no changes
-  }
-  ```
-  This must run AFTER all task processing is done, AFTER the run summary
-  is printed, but BEFORE the process exits. It should be the very last
-  action in the run command.
-  The commit message uses "noxdev:" prefix (not "noxdev(T#):") to distinguish
-  it from task commits.
-  Import execSync from 'node:child_process' if not already imported.
-  Do NOT change any other run logic — task loop, circuit breaker, retry,
-  Docker launches, SQLite writes all stay the same.
+- SPEC: Add a `noxdev remove <project>` command that cleanly unregisters a project.
+  Step 1: Create packages/cli/src/commands/remove.ts
+  The command takes a required project argument (the project ID).
+  It must:
+  1. Verify the project exists in SQLite:
+     `SELECT id, worktree_path FROM projects WHERE id = ?`
+     If not found, print `chalk.red('✖ Project not found: <id>')` and exit 1.
+  2. Ask for confirmation before deleting. Print:
+     `chalk.yellow('⚠ This will remove project "<id>" from noxdev.')` then
+     `chalk.gray('  SQLite records (runs, tasks, results) will be deleted.')` then
+     `chalk.gray('  Worktree at <path> will be removed.')` then
+     `chalk.gray('  Your repo and main branch are NOT affected.')`
+     Use readline to prompt: `Confirm? [y/N] `. Default is N. Only proceed on 'y' or 'Y'.
+  3. Delete from SQLite in order (foreign keys):
+     ```typescript
+     const db = getDb();
+     db.exec('BEGIN');
+     try {
+       db.prepare('DELETE FROM task_results WHERE run_id IN (SELECT id FROM runs WHERE project_id = ?)').run(projectId);
+       db.prepare('DELETE FROM tasks WHERE run_id IN (SELECT id FROM runs WHERE project_id = ?)').run(projectId);
+       db.prepare('DELETE FROM runs WHERE project_id = ?').run(projectId);
+       db.prepare('DELETE FROM projects WHERE id = ?').run(projectId);
+       db.exec('COMMIT');
+     } catch (err) {
+       db.exec('ROLLBACK');
+       throw err;
+     }
+     ```
+  4. Remove the git worktree if it exists:
+     ```typescript
+     try {
+       execSync(`git worktree remove ${worktreePath} --force`, { stdio: 'pipe' });
+     } catch {
+       // Worktree may already be gone, that's fine
+     }
+     ```
+  5. Print success: `chalk.green('✓ Project "<id>" removed from noxdev.')`
+  Step 2: Register the command in packages/cli/src/index.ts
+  Import and call the register function, following the same pattern as
+  the other commands. Find where registerProjects, registerRun, etc. are
+  called and add registerRemove in the same block.
+  Add a --force flag that skips the confirmation prompt:
+  `.option('-f, --force', 'Skip confirmation prompt')`
+  Import chalk from 'chalk', execSync from 'node:child_process',
+  readline from 'node:readline'.
+  Do NOT modify any other commands or files.
