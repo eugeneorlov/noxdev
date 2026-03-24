@@ -1,5 +1,6 @@
 import type { Command } from "commander";
 import { execSync } from "node:child_process";
+import { rmSync, existsSync } from "node:fs";
 import readline from "node:readline";
 import chalk from "chalk";
 import { getDb } from "../db/index.js";
@@ -7,6 +8,7 @@ import { getDb } from "../db/index.js";
 interface ProjectRow {
   id: string;
   worktree_path: string;
+  repo_path: string;
 }
 
 function askConfirmation(message: string): Promise<boolean> {
@@ -48,7 +50,7 @@ async function runRemove(projectId: string, force: boolean): Promise<void> {
 
   // 1. Verify the project exists in SQLite
   const project = db
-    .prepare("SELECT id, worktree_path FROM projects WHERE id = ?")
+    .prepare("SELECT id, worktree_path, repo_path FROM projects WHERE id = ?")
     .get(projectId) as ProjectRow | undefined;
 
   if (!project) {
@@ -71,7 +73,30 @@ async function runRemove(projectId: string, force: boolean): Promise<void> {
     }
   }
 
-  // 3. Delete from SQLite in order (foreign keys)
+  // 3. Remove the git worktree if it exists
+  const worktreePath = project.worktree_path;
+  const repoPath = project.repo_path;
+
+  // Step 1: Try git worktree remove (clean way)
+  try {
+    execSync(`git worktree remove "${worktreePath}" --force`, {
+      cwd: repoPath,
+      stdio: 'pipe'
+    });
+  } catch {
+    // Step 2: If git fails (repo gone, worktree detached), just rm -rf
+    try {
+      rmSync(worktreePath, { recursive: true, force: true });
+    } catch {
+      // Directory may already be gone, that's fine
+    }
+  }
+
+  if (!existsSync(worktreePath)) {
+    console.log(chalk.green(`  ✓ Worktree removed: ${worktreePath}`));
+  }
+
+  // 4. Delete from SQLite in order (foreign keys)
   db.exec('BEGIN');
   try {
     db.prepare('DELETE FROM task_results WHERE run_id IN (SELECT id FROM runs WHERE project_id = ?)').run(projectId);
@@ -82,13 +107,6 @@ async function runRemove(projectId: string, force: boolean): Promise<void> {
   } catch (err) {
     db.exec('ROLLBACK');
     throw err;
-  }
-
-  // 4. Remove the git worktree if it exists
-  try {
-    execSync(`git worktree remove ${project.worktree_path} --force`, { stdio: 'pipe' });
-  } catch {
-    // Worktree may already be gone, that's fine
   }
 
   // 5. Print success
