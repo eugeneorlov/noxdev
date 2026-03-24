@@ -87,6 +87,16 @@ async function runProject(project: ProjectRow): Promise<void> {
   };
 
   await executeRun(ctx);
+
+  // Auto-commit TASKS.md status updates
+  try {
+    const worktreePath = project.worktree_path;
+    execSync('git add TASKS.md', { cwd: worktreePath, stdio: 'pipe' });
+    execSync('git commit -m "noxdev: update task statuses"', { cwd: worktreePath, stdio: 'pipe' });
+    console.log(chalk.gray('  ✓ TASKS.md status updates committed'));
+  } catch {
+    // Silently ignore — TASKS.md might not exist or have no changes
+  }
 }
 
 export async function runAllProjects(
@@ -190,6 +200,16 @@ export async function runAllProjects(
           `⚠ Project ${proj.display_name} failed: ${err instanceof Error ? err.message : String(err)}`,
         ),
       );
+    }
+
+    // Auto-commit TASKS.md status updates
+    try {
+      const worktreePath = proj.worktree_path;
+      execSync('git add TASKS.md', { cwd: worktreePath, stdio: 'pipe' });
+      execSync('git commit -m "noxdev: update task statuses"', { cwd: worktreePath, stdio: 'pipe' });
+      console.log(chalk.gray('  ✓ TASKS.md status updates committed'));
+    } catch {
+      // Silently ignore — TASKS.md might not exist or have no changes
     }
 
     results.push({
