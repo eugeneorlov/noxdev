@@ -33,6 +33,9 @@ importers:
         specifier: ^8.2.0
         version: 8.2.0
     devDependencies:
+      '@noxdev/dashboard':
+        specifier: workspace:*
+        version: link:../dashboard
       '@types/better-sqlite3':
         specifier: ^7.6.13
         version: 7.6.13
