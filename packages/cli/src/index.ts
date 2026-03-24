@@ -10,6 +10,7 @@ import { registerMerge } from "./commands/merge.js";
 import { registerProjects } from "./commands/projects.js";
 import { registerDashboard } from "./commands/dashboard.js";
 import { registerDoctor } from "./commands/doctor.js";
+import { registerRemove } from "./commands/remove.js";
 
 const require = createRequire(import.meta.url);
 const { version } = require("../package.json");
@@ -29,6 +30,7 @@ registerMerge(program);
 registerProjects(program);
 registerDashboard(program);
 registerDoctor(program);
+registerRemove(program);
 
 // Check if no subcommand is provided (just "noxdev" or "noxdev --help")
 const args = process.argv.slice(2);
