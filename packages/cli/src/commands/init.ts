@@ -95,6 +95,12 @@ async function runInit(project: string, repoPath: string): Promise<void> {
   // 2. Create git worktree
   const spinnerWt = ora("Creating git worktree…").start();
   try {
+    // Detect the default branch name
+    const defaultBranch = execSync('git symbolic-ref --short HEAD', {
+      cwd: resolvedRepo,
+      encoding: 'utf-8'
+    }).trim();
+
     // Check if branch already exists
     let branchExists = false;
     try {
@@ -128,7 +134,7 @@ async function runInit(project: string, repoPath: string): Promise<void> {
       // Create new branch + worktree
       try {
         execSync(
-          `git worktree add -b ${branch} ${worktreePath} main`,
+          `git worktree add -b ${branch} ${worktreePath} ${defaultBranch}`,
           { cwd: resolvedRepo, stdio: "pipe" },
         );
       } catch (err: unknown) {
