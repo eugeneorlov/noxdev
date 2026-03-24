@@ -2,36 +2,6 @@ import { Link } from 'react-router-dom'
 import { useEffect } from 'react'
 import { ThemeToggle } from './ThemeToggle'
 
-// Owl logo SVG component that supports currentColor for dark mode
-function OwlLogo({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" className={className}>
-      {/* Owl head (main circle) */}
-      <circle cx="16" cy="16" r="14" fill="none" stroke="currentColor" strokeWidth="1.5"/>
-
-      {/* Ear tufts */}
-      <path d="M8 6 L10 2 L12 6" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-      <path d="M20 6 L22 2 L24 6" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-
-      {/* Left eye outer circle */}
-      <circle cx="11" cy="14" r="5" fill="none" stroke="currentColor" strokeWidth="1.2"/>
-      {/* Left eye iris */}
-      <circle cx="11" cy="14" r="3" fill="#C9A84C"/>
-      {/* Left eye pupil */}
-      <circle cx="11" cy="14" r="1.5" fill="currentColor"/>
-
-      {/* Right eye outer circle */}
-      <circle cx="21" cy="14" r="5" fill="none" stroke="currentColor" strokeWidth="1.2"/>
-      {/* Right eye iris */}
-      <circle cx="21" cy="14" r="3" fill="#C9A84C"/>
-      {/* Right eye pupil */}
-      <circle cx="21" cy="14" r="1.5" fill="currentColor"/>
-
-      {/* Beak */}
-      <path d="M16 20 L14 24 L18 24 Z" fill="currentColor"/>
-    </svg>
-  )
-}
 
 interface LayoutProps {
   children: React.ReactNode
@@ -53,7 +23,11 @@ export default function Layout({ children }: LayoutProps) {
         <div className="max-w-6xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <Link to="/" className="flex items-center space-x-4 hover:opacity-80 transition-opacity">
-              <OwlLogo className="h-7 text-gray-900 dark:text-gray-100" />
+              <img
+                src="/noxdev_owl.png"
+                alt="noxdev owl"
+                className="h-8 w-8 rounded-full"
+              />
               <span className="text-xl font-bold text-gray-900 dark:text-gray-100">noxdev</span>
             </Link>
             <nav className="flex items-center space-x-6">
