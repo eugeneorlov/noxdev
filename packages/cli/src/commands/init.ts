@@ -86,10 +86,28 @@ async function runInit(project: string, repoPath: string): Promise<void> {
   try {
     execSync('git rev-parse HEAD', { cwd: resolvedRepo, stdio: 'pipe' });
   } catch {
-    console.error(chalk.red('✖ Repository has no commits.'));
-    console.error(chalk.gray('  Make an initial commit first:'));
-    console.error(chalk.gray('  git add . && git commit -m "init"'));
-    process.exit(1);
+    // Empty repo — create initial commit automatically
+    console.log(chalk.yellow('  ⚠ Empty repository detected. Creating initial commit...'));
+    const readmePath = join(resolvedRepo, 'README.md');
+    if (!existsSync(readmePath)) {
+      writeFileSync(readmePath, `# ${project}\n`);
+    }
+    execSync('git add .', { cwd: resolvedRepo, stdio: 'pipe' });
+
+    // Set git identity if not configured
+    try {
+      execSync('git config user.name', { cwd: resolvedRepo, stdio: 'pipe' });
+    } catch {
+      execSync('git config user.name "noxdev"', { cwd: resolvedRepo, stdio: 'pipe' });
+    }
+    try {
+      execSync('git config user.email', { cwd: resolvedRepo, stdio: 'pipe' });
+    } catch {
+      execSync('git config user.email "noxdev@local"', { cwd: resolvedRepo, stdio: 'pipe' });
+    }
+
+    execSync('git commit -m "init"', { cwd: resolvedRepo, stdio: 'pipe' });
+    console.log(chalk.green('  ✓ Initial commit created'));
   }
 
   // 2. Create git worktree
