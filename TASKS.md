@@ -1,45 +1,44 @@
-# noxdev Fix: Revert to SVG owl in dashboard header
+# noxdev Fix: Auto-sync worktree before run
 
-## T1: Revert dashboard header logo from PNG to inline SVG
+## T1: Merge base branch into worktree at start of noxdev run
 - STATUS: done
-- FILES: packages/dashboard/src/components/Layout.tsx
-- VERIFY: cd packages/dashboard && pnpm build && grep -q "C9A84C" packages/dashboard/src/components/Layout.tsx && ! grep -q "noxdev_owl.png" packages/dashboard/src/components/Layout.tsx
+- FILES: packages/cli/src/commands/run.ts, packages/cli/src/db/schema.sql
+- VERIFY: pnpm build
 - CRITIC: skip
 - PUSH: auto
-- SPEC: The PNG owl logo (noxdev_owl.png) is too small at icon size in the
-  dashboard header. Revert to an inline SVG owl that works at 32x32 and
-  adapts to dark mode via currentColor.
-  In packages/dashboard/src/components/Layout.tsx, find the img tag in the
-  header that references noxdev_owl.png. It looks like this:
-  ```tsx
-  <img
-    src="/noxdev_owl.png"
-    alt="noxdev owl"
-    className="h-8 w-8 rounded-full"
-  />
+- SPEC: Before running any tasks, noxdev run should sync the worktree with
+  the project's base branch (main/master) so agents always work on current code.
+  In packages/cli/src/commands/run.ts, add a sync step AFTER loading the
+  project config but BEFORE the task loop starts:
+  ```typescript
+  // Sync worktree with base branch before running tasks
+  try {
+    const baseBranch = execSync('git symbolic-ref --short HEAD', {
+      cwd: project.repo_path,
+      encoding: 'utf-8'
+    }).trim();
+    execSync(`git merge ${baseBranch} --no-edit`, {
+      cwd: project.worktree_path,
+      stdio: 'pipe'
+    });
+    console.log(chalk.gray(`  ✓ Worktree synced with ${baseBranch}`));
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes('CONFLICT')) {
+      console.error(chalk.red('✖ Merge conflict syncing worktree with base branch.'));
+      console.error(chalk.gray('  Resolve manually: cd ' + project.worktree_path));
+      console.error(chalk.gray('  Then re-run: noxdev run ' + project.id));
+      process.exit(1);
+    }
+    // If merge fails for other reasons (already up to date, etc), continue
+    console.log(chalk.gray('  ✓ Worktree up to date'));
+  }
   ```
-  Replace that entire img tag with this EXACT inline SVG:
-  ```tsx
-  <svg className="h-8 w-8" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
-    <circle cx="16" cy="16" r="14" fill="none" stroke="currentColor" strokeWidth="1.5"/>
-    <path d="M8 6 L10 2 L12 6" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-    <path d="M20 6 L22 2 L24 6" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-    <circle cx="11" cy="14" r="5" fill="none" stroke="currentColor" strokeWidth="1.2"/>
-    <circle cx="11" cy="14" r="3" fill="#C9A84C"/>
-    <circle cx="11" cy="14" r="1.5" fill="currentColor"/>
-    <circle cx="21" cy="14" r="5" fill="none" stroke="currentColor" strokeWidth="1.2"/>
-    <circle cx="21" cy="14" r="3" fill="#C9A84C"/>
-    <circle cx="21" cy="14" r="1.5" fill="currentColor"/>
-    <path d="M16 20 L14 24 L18 24 Z" fill="currentColor"/>
-  </svg>
-  ```
-  This SVG has: circle face, ear tufts, two eyes with gold (#C9A84C) irises,
-  currentColor pupils, and a beak. Uses currentColor throughout so it
-  automatically adapts to light and dark mode.
-  Note: all SVG attributes MUST use React camelCase — strokeWidth not
-  stroke-width, strokeLinecap not stroke-linecap, strokeLinejoin not
-  stroke-linejoin. The code above already uses the correct casing.
-  Do NOT remove noxdev_owl.png from packages/dashboard/public/ — keep it
-  for README banner, LinkedIn, HN, and landing page.
-  Do NOT change routing, nav links, ThemeToggle, or any other Layout behavior.
-  Only replace the img tag with the inline SVG.
+  This runs git symbolic-ref on the REPO (not the worktree) to get the
+  base branch name, then merges it into the worktree. If there's a merge
+  conflict, it stops with a clear error instead of running tasks on
+  conflicted code. If the merge is clean or already up to date, it continues.
+  Import execSync from 'node:child_process' if not already imported.
+  Place this step right after the "Starting run" log line but before
+  parsing TASKS.md.
+  Do NOT change any other run logic.
