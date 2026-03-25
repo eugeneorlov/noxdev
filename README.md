@@ -21,7 +21,7 @@ An open-source Node.js CLI that orchestrates autonomous coding agents. Write tas
 ## Quick Start
 
 ```bash
-npm install -g noxdev
+npm install -g @eugene218/noxdev
 noxdev doctor                           # check prerequisites
 
 cd ~/projects/my-project                # must have at least one commit
