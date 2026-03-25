@@ -1,6 +1,7 @@
 import type { Command } from "commander";
 import type Database from "better-sqlite3";
 import chalk from "chalk";
+import { execSync } from "node:child_process";
 import { getDb } from "../db/index.js";
 import {
   getLatestRun,
@@ -38,6 +39,9 @@ interface TaskResultRow {
 interface ProjectRow {
   id: string;
   display_name: string;
+  repo_path: string;
+  worktree_path: string;
+  branch: string;
 }
 
 function relativeTime(isoDate: string): string {
@@ -56,14 +60,14 @@ function relativeTime(isoDate: string): string {
 }
 
 function statusBadge(status: string): string {
-  switch (status) {
-    case "completed":
+  switch (status.toUpperCase()) {
+    case "COMPLETED":
       return chalk.green("COMPLETED");
-    case "failed":
+    case "FAILED":
       return chalk.red("FAILED");
-    case "skipped":
+    case "SKIPPED":
       return chalk.yellow("SKIPPED");
-    case "completed_retry":
+    case "COMPLETED_RETRY":
       return chalk.green("COMPLETED") + chalk.green(" (retry)");
     default:
       return status.toUpperCase();
@@ -116,11 +120,59 @@ export function showProjectStatus(db: Database.Database, projectId: string): voi
     }
   }
 
+  // Check actual git branch state
+  const branchStatus = getBranchMergeStatus(project);
   const pending = getPendingMerge(db, run.id);
-  if (pending.length > 0) {
-    console.log("");
-    console.log(`Pending merge: ${pending.length} tasks awaiting review`);
-    console.log(`Next step: noxdev merge ${projectId}`);
+
+  console.log("");
+  if (branchStatus === "merged") {
+    console.log(chalk.green("Branch merged — nothing to commit"));
+    if (pending.length > 0) {
+      console.log(chalk.gray(`(${pending.length} tasks still marked pending in DB — already merged via git)`));
+    }
+  } else if (branchStatus === "ahead") {
+    if (pending.length > 0) {
+      console.log(`Pending merge: ${pending.length} tasks awaiting review`);
+      console.log(`Next step: noxdev merge ${projectId}`);
+    } else {
+      console.log(chalk.yellow("Worktree branch is ahead of main but no pending tasks in DB"));
+    }
+  } else {
+    // Could not determine git state, fall back to DB-only
+    if (pending.length > 0) {
+      console.log(`Pending merge: ${pending.length} tasks awaiting review`);
+      console.log(`Next step: noxdev merge ${projectId}`);
+    }
+  }
+}
+
+function getBranchMergeStatus(project: ProjectRow): "merged" | "ahead" | "unknown" {
+  try {
+    const mainSha = execSync("git rev-parse HEAD", {
+      cwd: project.repo_path,
+      encoding: "utf-8",
+    }).trim();
+    const worktreeSha = execSync("git rev-parse HEAD", {
+      cwd: project.worktree_path,
+      encoding: "utf-8",
+    }).trim();
+
+    if (mainSha === worktreeSha) {
+      return "merged";
+    }
+
+    // Check if worktree branch is an ancestor of main (already merged)
+    try {
+      execSync(`git merge-base --is-ancestor ${worktreeSha} ${mainSha}`, {
+        cwd: project.repo_path,
+      });
+      return "merged";
+    } catch {
+      // Not an ancestor — worktree is ahead
+      return "ahead";
+    }
+  } catch {
+    return "unknown";
   }
 }
 
