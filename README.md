@@ -117,6 +117,7 @@ A React web interface for reviewing the work. Run `noxdev dashboard` to start th
 - **Git worktree**: Main branch is never directly modified, always safe
 - **Nothing reaches main without review**: All commits stay local until `noxdev merge`
 - **Critic agent review**: Optional second-pass validation of changes
+- **Critic limitation — new files**: The critic reviews git diffs, so on greenfield projects where every file is new and untracked, the diff appears empty. This causes false rejections. Use `CRITIC: skip` for the first batch of tasks on any new project. Switch to `CRITIC: review` once there is tracked code to diff against.
 - **Circuit breaker**: 3 consecutive failures automatically pause a project
 - **SOPS + age encryption**: Secrets encrypted at rest, decrypted at container runtime only
 - **Auto-downgrade**: If any check fails on a `PUSH: auto` task, it downgrades to `gate`
