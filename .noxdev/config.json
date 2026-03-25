@@ -1,0 +1,16 @@
+{
+  "project": "noxdev",
+  "display_name": "noxdev",
+  "test_command": "pnpm test",
+  "build_command": "pnpm build",
+  "lint_command": "pnpm lint",
+  "docker": {
+    "memory": "4g",
+    "cpus": 2,
+    "timeout_minutes": 30
+  },
+  "secrets": "",
+  "tasks_file": "TASKS.md",
+  "critic_default": "strict",
+  "push_default": "never"
+}
