@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>noxdev — Documentation</title>
+<meta name="description" content="noxdev documentation: quickstart, CLI commands, TASKS.md format, and configuration reference.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Bebas+Neue&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0a0d13;--surface:#12161f;--surface2:#181d29;--border:#222939;
+  --gold:#C9A84C;--gold-dim:#a68a3a;
+  --green:#3fb950;--red:#f85149;--blue:#58a6ff;--amber:#d29922;
+  --text:#c9cfd8;--muted:#6b7280;--heading:#f0f2f5;
+  --mono:'JetBrains Mono',monospace;
+  --display:'Bebas Neue',sans-serif;
+  --sans:'DM Sans',sans-serif;
+}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);line-height:1.75}
+a{color:var(--gold);text-decoration:none}a:hover{color:var(--heading)}
+::selection{background:var(--gold);color:var(--bg)}
+.wrap{max-width:820px;margin:0 auto;padding:0 28px}
+
+/* Nav */
+nav{position:fixed;top:0;left:0;right:0;z-index:100;backdrop-filter:blur(14px);background:rgba(10,13,19,.88);border-bottom:1px solid var(--border);padding:12px 0}
+nav .wrap{display:flex;align-items:center;justify-content:space-between}
+.nav-logo{font-family:var(--mono);font-weight:600;font-size:18px;color:var(--gold)}
+.nav-links{display:flex;gap:20px;align-items:center}
+.nav-links a{color:var(--muted);font-size:13px;font-family:var(--mono)}
+.nav-links a:hover{color:var(--heading)}
+
+/* Content */
+main{padding:100px 0 60px}
+h1{font-family:var(--display);font-size:3rem;color:var(--heading);margin-bottom:8px;letter-spacing:.02em}
+.subtitle{color:var(--muted);font-size:1rem;margin-bottom:48px}
+h2{font-family:var(--display);font-size:1.8rem;color:var(--heading);margin:48px 0 16px;letter-spacing:.02em;padding-top:16px;border-top:1px solid var(--border)}
+h2:first-of-type{border-top:none;margin-top:0}
+h3{font-family:var(--mono);font-size:14px;color:var(--gold);margin:28px 0 8px;text-transform:uppercase;letter-spacing:.06em}
+p{margin-bottom:16px;color:var(--text)}
+p.muted{color:var(--muted);font-size:14px}
+
+/* Code blocks */
+pre{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:18px 20px;font-family:var(--mono);font-size:13px;line-height:1.8;overflow-x:auto;margin:12px 0 20px;white-space:pre}
+code{font-family:var(--mono);font-size:13px;color:var(--green);background:rgba(63,185,80,.08);padding:1px 6px;border-radius:3px}
+pre code{background:none;padding:0;color:var(--text)}
+.comment{color:var(--muted)}
+.cmd-highlight{color:var(--gold)}
+.output{color:var(--muted)}
+.success{color:var(--green)}
+
+/* Command reference table */
+.cmd-table{width:100%;border-collapse:collapse;margin:16px 0 24px;font-size:14px}
+.cmd-table th{text-align:left;font-family:var(--mono);font-size:12px;color:var(--gold);text-transform:uppercase;letter-spacing:.06em;padding:8px 12px;border-bottom:1px solid var(--border)}
+.cmd-table td{padding:10px 12px;border-bottom:1px solid var(--border);vertical-align:top}
+.cmd-table td:first-child{font-family:var(--mono);font-size:13px;color:var(--green);white-space:nowrap}
+.cmd-table td:last-child{color:var(--muted)}
+.cmd-table tr:hover{background:var(--surface)}
+
+/* Sidebar TOC */
+.toc{position:fixed;left:calc(50% + 440px);top:120px;width:180px;font-size:12px}
+.toc a{display:block;padding:4px 0;color:var(--muted);font-family:var(--mono);transition:color .15s}
+.toc a:hover{color:var(--gold)}
+@media(max-width:1200px){.toc{display:none}}
+
+/* Task spec format */
+.spec-block{background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin:16px 0 24px}
+.spec-header{padding:10px 18px;border-bottom:1px solid var(--border);background:var(--surface2);font-family:var(--mono);font-size:12px;color:var(--muted)}
+.spec-body{padding:18px;font-family:var(--mono);font-size:13px;line-height:1.9;white-space:pre;overflow-x:auto}
+.sk{color:var(--gold)}.sv{color:var(--green)}.sc{color:var(--muted)}.sb{color:var(--blue)}
+
+/* Footer */
+footer{border-top:1px solid var(--border);padding:24px 0;margin-top:48px}
+footer .wrap{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);font-family:var(--mono)}
+footer a{color:var(--gold)}
+</style>
+</head>
+<body>
+
+<nav>
+<div class="wrap">
+  <a href="index.html" class="nav-logo">noxdev docs</a>
+  <div class="nav-links">
+    <a href="index.html">Home</a>
+    <a href="#quickstart">Quickstart</a>
+    <a href="#commands">Commands</a>
+    <a href="#tasks-format">TASKS.md</a>
+    <a href="https://github.com/eugeneorlov/noxdev" target="_blank" rel="noopener">GitHub</a>
+  </div>
+</div>
+</nav>
+
+<div class="toc">
+  <a href="#quickstart">Quickstart</a>
+  <a href="#demo-run">Demo run</a>
+  <a href="#commands">All commands</a>
+  <a href="#tasks-format">TASKS.md format</a>
+  <a href="#configuration">Configuration</a>
+  <a href="#overnight">--overnight mode</a>
+  <a href="#requirements">Requirements</a>
+</div>
+
+<main>
+<div class="wrap">
+
+<h1>Documentation</h1>
+<p class="subtitle">Everything you need to get noxdev running.</p>
+
+<!-- Quickstart -->
+<h2 id="quickstart">Quickstart</h2>
+
+<pre><code><span class="comment"># Install</span>
+<span class="cmd-highlight">npm install -g noxdev</span>
+
+<span class="comment"># Check prerequisites</span>
+<span class="cmd-highlight">noxdev doctor</span>
+
+<span class="comment"># Register an existing project (must have at least one commit)</span>
+<span class="cmd-highlight">cd ~/projects/my-project</span>
+<span class="cmd-highlight">noxdev init my-project --repo .</span>
+
+<span class="comment"># Write tasks in the worktree</span>
+<span class="cmd-highlight">vi ~/worktrees/my-project/TASKS.md</span>
+
+<span class="comment"># Run</span>
+<span class="cmd-highlight">noxdev run my-project</span>
+
+<span class="comment"># Review</span>
+<span class="cmd-highlight">noxdev status my-project</span>
+<span class="cmd-highlight">noxdev merge my-project</span></code></pre>
+
+<!-- Demo run -->
+<h2 id="demo-run">End-to-end demo run</h2>
+
+<p>A full walkthrough from init to merge using a temporary test project.</p>
+
+<h3>1. Initialize a project</h3>
+<pre><code><span class="cmd-highlight">mkdir -p /tmp/test-noxdev && cd /tmp/test-noxdev && git init</span>
+<span class="cmd-highlight">echo "# test" > README.md && git add . && git commit -m "init"</span>
+<span class="cmd-highlight">noxdev init test-verify --repo .</span>
+<span class="cmd-highlight">noxdev projects</span></code></pre>
+
+<h3>2. Check status (no runs yet)</h3>
+<pre><code><span class="cmd-highlight">noxdev status test-verify</span></code></pre>
+
+<h3>3. Write a task and run</h3>
+<pre><code><span class="cmd-highlight">cat > ~/worktrees/test-verify/TASKS.md << 'EOF'</span>
+## T1: Create hello.txt
+- STATUS: pending
+- FILES: hello.txt
+- VERIFY: cat hello.txt
+- CRITIC: skip
+- PUSH: auto
+- SPEC: Create a file called hello.txt containing "hello from noxdev"
+<span class="cmd-highlight">EOF</span>
+
+<span class="cmd-highlight">noxdev run test-verify</span></code></pre>
+
+<h3>4. Review results</h3>
+<pre><code><span class="comment"># Summary</span>
+<span class="cmd-highlight">noxdev status test-verify</span>
+
+<span class="comment"># Full task detail: spec, agent logs, diff, duration</span>
+<span class="cmd-highlight">noxdev log T1</span></code></pre>
+
+<h3>5. Merge (from the repo, not the worktree)</h3>
+<pre><code><span class="cmd-highlight">cd /tmp/test-noxdev</span>
+<span class="cmd-highlight">noxdev merge test-verify</span>
+
+<span class="comment"># Then push when ready</span>
+<span class="output"># git push origin master</span></code></pre>
+
+<h3>6. Dashboard (optional)</h3>
+<pre><code><span class="cmd-highlight">noxdev dashboard</span>
+<span class="comment"># Opens http://localhost:4400 — Ctrl+C to stop</span></code></pre>
+
+<h3>7. Cleanup</h3>
+<pre><code><span class="cmd-highlight">noxdev remove test-verify --force</span></code></pre>
+
+<!-- All commands -->
+<h2 id="commands">All CLI commands</h2>
+
+<pre><code><span class="output">    ,___,
+    [O.O]         noxdev v0.1.0
+   /)   )\        ship code while you sleep
+   " \|/ "
+  ---m-m---</span></code></pre>
+
+<table class="cmd-table">
+<thead><tr><th>Command</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td>noxdev init &lt;project&gt;</td><td>Initialize a new project. Creates worktree, branch, registers in SQLite. Auto-creates initial commit if repo is empty.</td></tr>
+<tr><td>noxdev run [project]</td><td>Run pending tasks from TASKS.md. Parses specs, spins up Docker containers, executes tasks, writes results to SQLite.</td></tr>
+<tr><td>noxdev run --all</td><td>Run all registered projects sequentially. Each project runs its full task queue. Circuit breaker applies per project.</td></tr>
+<tr><td>noxdev run --overnight</td><td>Detached background mode. Frees your terminal, prevents system sleep (<code>systemd-inhibit</code> on Linux, <code>caffeinate</code> on macOS), writes PID to <code>~/.noxdev/noxdev.pid</code>.</td></tr>
+<tr><td>noxdev status [project]</td><td>Morning summary. Shows last run: completed/failed counts, commit list, pending merge decisions.</td></tr>
+<tr><td>noxdev log &lt;task-id&gt;</td><td>Full task execution detail: spec, agent logs, diff, duration, merge status.</td></tr>
+<tr><td>noxdev merge [project]</td><td>Interactive per-commit approve/reject/diff/skip workflow. Approved commits merge to main. Rejected commits are explicitly reverted. Skipped tasks stay pending for next review.</td></tr>
+<tr><td>noxdev projects</td><td>List all registered projects with last run status.</td></tr>
+<tr><td>noxdev dashboard</td><td>Launch React web UI on localhost:4400. Overview, run detail, task detail with diff viewer, merge review, dark mode.</td></tr>
+<tr><td>noxdev doctor</td><td>Check all prerequisites: Docker, git, Claude Code CLI, Node.js, pnpm, SOPS, age.</td></tr>
+<tr><td>noxdev remove &lt;project&gt;</td><td>Unregister a project. Removes worktree directory, deletes from SQLite. Use <code>--force</code> to skip confirmation.</td></tr>
+</tbody>
+</table>
+
+<p class="muted"><strong>noxdev merge vs git merge:</strong> Unlike <code>git merge</code> which merges an entire branch, <code>noxdev merge</code> operates per-task — you approve, reject, or skip each commit individually. Rejected work is explicitly reverted with a traceable commit. Skipped tasks remain pending. All decisions are tracked in SQLite.</p>
+
+<!-- TASKS.md format -->
+<h2 id="tasks-format">TASKS.md format</h2>
+
+<p>The task spec is the unit of work. No spec, no session.</p>
+
+<div class="spec-block">
+<div class="spec-header">TASKS.md</div>
+<div class="spec-body"><span class="sc">## T1: Short directive title</span>
+<span class="sk">- STATUS:</span> <span class="sb">pending</span>
+<span class="sk">- FILES:</span> <span class="sv">src/components/Button.tsx</span>
+<span class="sk">- VERIFY:</span> <span class="sv">pnpm build && pnpm test</span>
+<span class="sk">- CRITIC:</span> <span class="sv">review</span>
+<span class="sk">- PUSH:</span> <span class="sv">auto</span>
+<span class="sk">- SPEC:</span> <span class="sv">Detailed description of what to do.</span>
+<span class="sv">  Can span multiple lines. Include code</span>
+<span class="sv">  snippets, SQL schemas, API contracts inline.</span></div>
+</div>
+
+<h3>Fields</h3>
+<table class="cmd-table">
+<thead><tr><th>Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td>STATUS</td><td><code>pending</code>, <code>done</code>, <code>failed</code>, <code>skipped</code> — auto-updated by noxdev after each run</td></tr>
+<tr><td>FILES</td><td>Hint for the agent about which files to modify. Not a constraint — the agent can touch other files.</td></tr>
+<tr><td>VERIFY</td><td>Command that must exit 0 for the task to succeed. Test that it <em>works</em>, not just that it compiles.</td></tr>
+<tr><td>CRITIC</td><td><code>skip</code> or <code>review</code>. When <code>review</code>, a second agent reviews the diff for correctness and scope.</td></tr>
+<tr><td>PUSH</td><td><code>auto</code> (tests pass → commit), <code>gate</code> (commit stays local for manual review), <code>manual</code> (no auto-commit).</td></tr>
+<tr><td>SPEC</td><td>The directive. Be specific. Include working code inline when wrapping existing logic.</td></tr>
+</tbody>
+</table>
+
+<h3>Tips from practice</h3>
+<p><strong>Good spec:</strong> "Add loading spinner to the match button. Show spinner while request is in flight, hide on response. VERIFY: pnpm build passes."</p>
+<p><strong>Bad spec:</strong> "Improve the UX of the matching flow."</p>
+<p class="muted">Directive specs with explicit stopping conditions work reliably. Open-ended or exploratory specs cause the agent to hang indefinitely in Docker. When wrapping existing code, paste the working code into the SPEC — otherwise the agent invents new patterns instead of preserving yours.</p>
+
+<!-- Configuration -->
+<h2 id="configuration">Configuration</h2>
+
+<h3>Global: ~/.noxdev/</h3>
+<pre><code><span class="output">~/.noxdev/
+  ledger.db        # SQLite database (auto-created)
+  config.json      # Global settings
+  logs/            # Run logs per project + run ID
+  noxdev.pid       # PID file when running --overnight</span></code></pre>
+
+<h3>Per-project: .noxdev/config.json</h3>
+<pre><code>{
+  <span class="sk">"project"</span>: <span class="sv">"my-project"</span>,
+  <span class="sk">"display_name"</span>: <span class="sv">"My Project"</span>,
+  <span class="sk">"test_command"</span>: <span class="sv">"pnpm test"</span>,
+  <span class="sk">"build_command"</span>: <span class="sv">"pnpm build"</span>,
+  <span class="sk">"lint_command"</span>: <span class="sv">"pnpm lint --fix"</span>,
+  <span class="sk">"docker"</span>: {
+    <span class="sk">"memory"</span>: <span class="sv">"4g"</span>,
+    <span class="sk">"timeout_minutes"</span>: <span class="sv">30</span>,
+    <span class="sk">"cpus"</span>: <span class="sv">2</span>
+  },
+  <span class="sk">"api"</span>: {
+    <span class="sk">"fallback"</span>: <span class="sv">true</span>,
+    <span class="sk">"dailyCapUsd"</span>: <span class="sv">5</span>,
+    <span class="sk">"model"</span>: <span class="sv">"claude-sonnet-4-20250514"</span>
+  }
+}</code></pre>
+
+<!-- Overnight -->
+<h2 id="overnight">--overnight mode</h2>
+<p><code>noxdev run &lt;project&gt; --overnight</code> runs the exact same task execution as a normal run, but as a detached background process:</p>
+<p><strong>Detaches the process</strong> — spawns a child node process with <code>detached: true</code> and <code>stdio: "ignore"</code>, then calls <code>child.unref()</code> so your terminal is immediately freed.</p>
+<p><strong>Inhibits system sleep</strong> — wraps the child process in <code>systemd-inhibit --what=sleep</code> on Linux or <code>caffeinate -s</code> on macOS. Your machine stays awake while the run is in progress.</p>
+<p><strong>Writes a PID file</strong> to <code>~/.noxdev/noxdev.pid</code> so you can check on it later.</p>
+<p class="muted">Designed for kicking off a long run before closing your laptop lid or walking away. Fire and forget.</p>
+
+<!-- Requirements -->
+<h2 id="requirements">Requirements</h2>
+<pre><code><span class="cmd-highlight">noxdev doctor</span>   <span class="comment"># checks all of these</span></code></pre>
+<p>Node.js 18+ · Docker (running) · Git · Claude Code CLI (installed + authenticated) · pnpm (recommended)</p>
+
+</div>
+</main>
+
+<footer>
+<div class="wrap">
+  <span>noxdev · MIT license · <a href="https://www.linkedin.com/in/eugene-orlov/" target="_blank" rel="noopener">Eugene Orlov</a></span>
+  <a href="https://github.com/eugeneorlov/noxdev" target="_blank" rel="noopener">GitHub</a>
+</div>
+</footer>
+
+</body>
+</html>
