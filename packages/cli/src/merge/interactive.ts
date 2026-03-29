@@ -59,6 +59,34 @@ export function getMergeCandidates(
   }));
 }
 
+export function getAutoApprovedTasks(
+  db: Database.Database,
+  projectId: string,
+): MergeCandidate[] {
+  const run = getLatestRun(db, projectId) as RunRow | null;
+  if (!run) return [];
+
+  const rows = db
+    .prepare(
+      `SELECT id, task_id, title, status, commit_sha, diff_file
+       FROM task_results
+       WHERE run_id = ?
+         AND status IN ('completed', 'completed_retry')
+         AND merge_decision = 'approved'
+         AND commit_sha IS NOT NULL`,
+    )
+    .all(run.id) as TaskResultRow[];
+
+  return rows.map((r) => ({
+    taskResultId: r.id,
+    taskId: r.task_id,
+    title: r.title,
+    status: r.status,
+    commitSha: r.commit_sha!,
+    diffFile: r.diff_file,
+  }));
+}
+
 export function getDiffStats(worktreeDir: string, commitSha: string): string {
   return execSync(`git show --stat --format="" ${commitSha}`, {
     cwd: worktreeDir,

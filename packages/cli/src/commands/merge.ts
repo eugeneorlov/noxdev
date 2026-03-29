@@ -5,6 +5,7 @@ import { getDb } from "../db/index.js";
 import { getLatestRun, getProject, getAllProjects } from "../db/queries.js";
 import {
   getMergeCandidates,
+  getAutoApprovedTasks,
   getDiffStats,
   getFullDiff,
   applyMergeDecisions,
@@ -126,43 +127,57 @@ export function registerMerge(program: Command): void {
           return;
         }
 
-        const candidates = getMergeCandidates(db, projectId);
-        if (candidates.length === 0) {
-          console.log("No pending merge tasks.");
+        // Get auto-approved tasks and pending tasks separately
+        const autoApproved = getAutoApprovedTasks(db, projectId);
+        const pendingCandidates = getMergeCandidates(db, projectId);
+
+        if (autoApproved.length === 0 && pendingCandidates.length === 0) {
+          console.log("No merge tasks.");
           return;
         }
 
         const run = getLatestRun(db, projectId) as RunRow | null;
         const runId = run?.id ?? "unknown";
-        console.log(
-          `Run ${runId}: ${chalk.bold(String(candidates.length))} tasks pending review`,
-        );
 
-        // Interactive review
+        // Show auto-approved tasks summary
+        if (autoApproved.length > 0) {
+          console.log(
+            chalk.green(`  ✓ ${autoApproved.length} auto-approved tasks (PUSH: auto)`)
+          );
+        }
+
+        // Interactive review for pending tasks only
         const decisions: MergeDecision[] = [];
-        for (const candidate of candidates) {
-          const decision = await reviewCandidate(rl, candidate, proj.worktree_path);
-          decisions.push({
-            taskResultId: candidate.taskResultId,
-            taskId: candidate.taskId,
-            decision,
-          });
+        if (pendingCandidates.length > 0) {
+          console.log(
+            `Run ${runId}: ${chalk.bold(String(pendingCandidates.length))} tasks pending review`,
+          );
+
+          for (const candidate of pendingCandidates) {
+            const decision = await reviewCandidate(rl, candidate, proj.worktree_path);
+            decisions.push({
+              taskResultId: candidate.taskResultId,
+              taskId: candidate.taskId,
+              decision,
+            });
+          }
         }
 
         // Summary
-        const approved = decisions.filter((d) => d.decision === "approved").length;
+        const interactiveApproved = decisions.filter((d) => d.decision === "approved").length;
         const rejected = decisions.filter((d) => d.decision === "rejected").length;
         const skipped = decisions.filter((d) => d.decision === "skipped").length;
+        const totalApproved = autoApproved.length + interactiveApproved;
 
         console.log("");
         console.log(
-          `Summary: ${chalk.green(String(approved))} approved, ${chalk.red(String(rejected))} rejected, ${chalk.gray(String(skipped))} skipped`,
+          `Summary: ${autoApproved.length} auto-approved, ${chalk.green(String(interactiveApproved))} approved, ${chalk.red(String(rejected))} rejected, ${chalk.gray(String(skipped))} skipped`,
         );
 
-        if (approved > 0) {
+        if (totalApproved > 0) {
           const confirm = await askQuestion(
             rl,
-            `Merge ${approved} approved commits to main? [y/n] `,
+            `Merge ${totalApproved} approved commits to main? [y/n] `,
           );
           if (confirm === "y") {
             const result = applyMergeDecisions(
