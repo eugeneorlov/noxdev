@@ -1,37 +1,70 @@
-# noxdev: Version bump to v1.0.0
+# noxdev: Auto-approve PUSH:auto tasks at merge decision time
 
-## T1: Bump version to 1.0.0 across the monorepo
+# Dependencies: Phase G complete, all manual fixes committed
+# Gate: pnpm build
+#
+# Single task — focused change across run engine + merge command
+
+## T1: Auto-approve PUSH:auto tasks in run engine and skip them in merge prompt
 - STATUS: done
-- FILES: packages/cli/package.json, packages/dashboard/package.json, package.json, CHANGELOG.md
-- VERIFY: pnpm build && node packages/cli/dist/index.js --version 2>&1 | grep -q "1.0.0"
+- FILES: packages/cli/src/commands/run.ts, packages/cli/src/commands/merge.ts
+- VERIFY: cd packages/cli && pnpm build && grep -q "merge_decision.*approved" src/commands/run.ts && grep -q "pending" src/commands/merge.ts
 - CRITIC: skip
 - PUSH: auto
-- SPEC: Bump the version from 0.1.0 to 1.0.0 across all package.json files.
-  1. In packages/cli/package.json: change "version": "0.1.0" to "version": "1.0.0"
-  2. In packages/dashboard/package.json: change "version": "0.1.0" to "version": "1.0.0"
-  3. In the root package.json: change "version": "0.1.0" to "version": "1.0.0"
-  4. In CHANGELOG.md: add a new section at the top:
+- SPEC: Currently all tasks get merge_decision='pending' regardless of push mode.
+  This means PUSH:auto and PUSH:gate behave identically at merge time — both
+  require interactive approval. Fix this so the three-tier push model is meaningful
+  end-to-end:
+  
+  PUSH:auto  → merge_decision='approved' set immediately after successful task
+  PUSH:gate  → merge_decision='pending', requires interactive approval via noxdev merge
+  PUSH:manual → merge_decision='pending', same as gate
+  
+  FILE 1: packages/cli/src/commands/run.ts
+  
+  Find where task_results are INSERT'd or UPDATE'd after a successful task completion.
+  Look for where merge_decision is set to 'pending'. When the task's push mode is
+  'auto' AND the task status is COMPLETED or COMPLETED_RETRY, set merge_decision
+  to 'approved' and merged_at to datetime('now') instead of 'pending'.
+  
+  The push mode comes from the parsed TASKS.md task entry. The parser reads the
+  PUSH field. Find how the task's push mode is accessed in run.ts (likely from the
+  parsed task object) and use it in the conditional.
+  
+  Pseudocode for the change:
+  ```
+  const mergeDecision = (task.push === 'auto' && (status === 'COMPLETED' || status === 'COMPLETED_RETRY'))
+    ? 'approved'
+    : 'pending';
+  // Use mergeDecision in the INSERT/UPDATE statement instead of hardcoded 'pending'
+  // If mergeDecision is 'approved', also set merged_at to new Date().toISOString()
+  ```
+  
+  FILE 2: packages/cli/src/commands/merge.ts
+  
+  Find the interactive merge loop where tasks are presented for approve/reject.
+  Currently it queries all tasks with commits. Change the logic:
+  
+  1. Query task_results for the latest run. Separate into two groups:
+     - Already approved (merge_decision = 'approved') — these are PUSH:auto tasks
+     - Pending review (merge_decision = 'pending') — these are PUSH:gate tasks
+  
+  2. If there are auto-approved tasks, print a summary line:
      ```
-     ## [1.0.0] - 2026-03-24
-
-     ### Added
-     - Multi-project orchestration with `noxdev run --all`
-     - Interactive merge workflow with `noxdev merge`
-     - React morning dashboard with dark mode
-     - SQLite ledger for full execution history
-     - `noxdev doctor` prerequisite checker (9/9 checks)
-     - `noxdev remove` command for project cleanup
-     - Auto-sync worktree with base branch before runs
-     - Auto-commit TASKS.md status updates after runs
-     - Auto-create initial commit for empty repos during init
-     - Default branch detection (main/master/custom)
-     - Diff capture includes untracked files for critic review
-     - Credential snapshot restore before each Docker launch
-
-     ### Fixed
-     - Merge badge UX: hidden for auto-push, prefixed for gate tasks
-     - Approve/Reject buttons: help text clarifying CLI merge required
-     - noxdev projects: reads TASKS.md from worktree, not repo
-     - Turbo build order: dashboard builds before CLI
+     chalk.green(`  ✓ ${autoApproved.length} auto-approved tasks (PUSH: auto)`)
      ```
-  Do NOT change any other fields in package.json files.
+     Do NOT prompt for these — they're already decided.
+  
+  3. Only show the interactive approve/reject prompt for pending tasks.
+     If there are zero pending tasks, skip the interactive loop entirely.
+  
+  4. After the interactive loop (or if skipped), proceed with the git merge
+     as normal — merge all approved tasks (both auto and interactively approved).
+  
+  5. Print the final summary showing both:
+     ```
+     Summary: {autoApproved} auto-approved, {interactiveApproved} approved, {rejected} rejected
+     ```
+  
+  Do NOT change: the git merge logic itself, the SQLite schema, the dashboard
+  API routes, the reject/revert logic, or any other command.
