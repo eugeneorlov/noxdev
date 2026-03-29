@@ -43,8 +43,36 @@ export function getMergeCandidates(
       `SELECT id, task_id, title, status, commit_sha, diff_file
        FROM task_results
        WHERE run_id = ?
-         AND status IN ('COMPLETED', 'COMPLETED_RETRY')
+         AND status IN ('completed', 'completed_retry')
          AND merge_decision = 'pending'
+         AND commit_sha IS NOT NULL`,
+    )
+    .all(run.id) as TaskResultRow[];
+
+  return rows.map((r) => ({
+    taskResultId: r.id,
+    taskId: r.task_id,
+    title: r.title,
+    status: r.status,
+    commitSha: r.commit_sha!,
+    diffFile: r.diff_file,
+  }));
+}
+
+export function getAutoApprovedTasks(
+  db: Database.Database,
+  projectId: string,
+): MergeCandidate[] {
+  const run = getLatestRun(db, projectId) as RunRow | null;
+  if (!run) return [];
+
+  const rows = db
+    .prepare(
+      `SELECT id, task_id, title, status, commit_sha, diff_file
+       FROM task_results
+       WHERE run_id = ?
+         AND status IN ('completed', 'completed_retry')
+         AND merge_decision = 'approved'
          AND commit_sha IS NOT NULL`,
     )
     .all(run.id) as TaskResultRow[];
@@ -87,7 +115,6 @@ export function applyMergeDecisions(
   // Look up commit SHAs for rejected decisions
   const candidates = getMergeCandidatesForDecisions(db, decisions);
 
-  // Phase 1: Apply git operations (reverts for rejected, count approved)
   for (const d of decisions) {
     if (d.decision === "rejected") {
       const candidate = candidates.get(d.taskResultId);
@@ -100,15 +127,18 @@ export function applyMergeDecisions(
           { cwd: worktreeDir },
         );
       }
+      updateMergeDecision(db, d.taskResultId, "rejected", now);
       rejected++;
     } else if (d.decision === "approved") {
+      updateMergeDecision(db, d.taskResultId, "approved", now);
       merged++;
     } else {
+      // skipped — leave merge_decision as pending
       skipped++;
     }
   }
 
-  // Phase 2: Merge worktree branch into main (before updating DB, so failures are retryable)
+  // Merge worktree branch into main if any approved
   if (merged > 0) {
     const run = getRunForDecisions(db, decisions, candidates);
     const branch = getBranchFromWorktree(worktreeDir);
@@ -117,16 +147,6 @@ export function applyMergeDecisions(
       `git merge ${branch} -m "noxdev: merge ${merged} approved tasks from run ${runId}"`,
       { cwd: projectGitDir },
     );
-  }
-
-  // Phase 3: Update DB only after git operations succeed
-  for (const d of decisions) {
-    if (d.decision === "rejected") {
-      updateMergeDecision(db, d.taskResultId, "rejected", now);
-    } else if (d.decision === "approved") {
-      updateMergeDecision(db, d.taskResultId, "approved", now);
-    }
-    // skipped — leave merge_decision as pending
   }
 
   return { merged, rejected, skipped };

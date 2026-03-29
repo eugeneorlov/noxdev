@@ -72,37 +72,37 @@ describe("getMergeCandidates", () => {
       runId: "run-1",
       taskId: "T1",
       title: "Task One",
-      status: "COMPLETED",
+      status: "completed",
       commitSha: "aaa111",
     });
 
-    // COMPLETED_RETRY with commit — should be returned
+    // completed_retry with commit — should be returned
     insertTaskResult(db, {
       ...TASK_DEFAULTS,
       runId: "run-1",
       taskId: "T2",
       title: "Task Two",
-      status: "COMPLETED_RETRY",
+      status: "completed_retry",
       commitSha: "bbb222",
     });
 
-    // FAILED — should NOT be returned
+    // failed — should NOT be returned
     insertTaskResult(db, {
       ...TASK_DEFAULTS,
       runId: "run-1",
       taskId: "T3",
       title: "Task Three",
-      status: "FAILED",
+      status: "failed",
       commitSha: "ccc333",
     });
 
-    // COMPLETED but no commit sha — should NOT be returned
+    // completed but no commit sha — should NOT be returned
     insertTaskResult(db, {
       ...TASK_DEFAULTS,
       runId: "run-1",
       taskId: "T4",
       title: "Task Four",
-      status: "COMPLETED",
+      status: "completed",
       commitSha: null,
     });
 
@@ -110,10 +110,10 @@ describe("getMergeCandidates", () => {
     expect(candidates).toHaveLength(2);
     expect(candidates[0].taskId).toBe("T1");
     expect(candidates[0].commitSha).toBe("aaa111");
-    expect(candidates[0].status).toBe("COMPLETED");
+    expect(candidates[0].status).toBe("completed");
     expect(candidates[1].taskId).toBe("T2");
     expect(candidates[1].commitSha).toBe("bbb222");
-    expect(candidates[1].status).toBe("COMPLETED_RETRY");
+    expect(candidates[1].status).toBe("completed_retry");
   });
 
   it("returns empty array when no pending tasks", () => {
@@ -123,7 +123,7 @@ describe("getMergeCandidates", () => {
       runId: "run-1",
       taskId: "T1",
       title: "Task One",
-      status: "COMPLETED",
+      status: "completed",
       commitSha: "aaa111",
     });
 
@@ -201,7 +201,7 @@ describe("applyMergeDecisions", () => {
       runId: "run-1",
       taskId: "T1",
       title: "Task One",
-      status: "COMPLETED",
+      status: "completed",
       commitSha: "aaa111",
     });
     insertTaskResult(db, {
@@ -209,7 +209,7 @@ describe("applyMergeDecisions", () => {
       runId: "run-1",
       taskId: "T2",
       title: "Task Two",
-      status: "COMPLETED",
+      status: "completed",
       commitSha: "bbb222",
     });
 
@@ -253,7 +253,7 @@ describe("applyMergeDecisions", () => {
       runId: "run-1",
       taskId: "T1",
       title: "Task One",
-      status: "COMPLETED",
+      status: "completed",
       commitSha: "aaa111",
     });
     insertTaskResult(db, {
@@ -261,7 +261,7 @@ describe("applyMergeDecisions", () => {
       runId: "run-1",
       taskId: "T2",
       title: "Task Two",
-      status: "COMPLETED",
+      status: "completed",
       commitSha: "bbb222",
     });
     insertTaskResult(db, {
@@ -269,7 +269,7 @@ describe("applyMergeDecisions", () => {
       runId: "run-1",
       taskId: "T3",
       title: "Task Three",
-      status: "COMPLETED",
+      status: "completed",
       commitSha: "ccc333",
     });
 
@@ -334,7 +334,7 @@ describe("applyMergeDecisions", () => {
       runId: "run-1",
       taskId: "T1",
       title: "Task One",
-      status: "COMPLETED",
+      status: "completed",
       commitSha: "aaa111",
     });
 

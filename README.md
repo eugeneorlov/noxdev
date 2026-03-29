@@ -1,35 +1,32 @@
 ```
     ,___,
-    [O.O]         
-   /)   )\        
-   " \|/ "
-  ---m-m---
+    [O.O]
+   /)   )\
+  " \|/ "
+ ---m-m---
 ```
 
 # noxdev
 
-Ship code while you sleep.
+Ship code while you sleep
 
-[![npm version](https://img.shields.io/badge/npm-1.0.0-green.svg)](https://www.npmjs.com/package/noxdev)
+[![npm version](https://img.shields.io/badge/npm-0.1.0-green.svg)](https://www.npmjs.com/package/noxdev)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen.svg)](https://nodejs.org/)
 
 ## What is noxdev
 
-An open-source Node.js CLI that orchestrates autonomous coding agents. Write task specs, go to sleep, wake up to real commits on production codebases. Docker isolation, git worktree separation, and a review workflow keep your main branch safe.
+An open-source Node.js CLI that orchestrates autonomous coding agents overnight. Write task specs, go to sleep, wake up to real commits on production codebases. Docker containment, git worktree isolation, and a morning review workflow keep your main branch safe.
 
 ## Quick Start
 
 ```bash
-npm install -g @eugene218/noxdev
+npm install -g noxdev
 noxdev doctor                           # check prerequisites
-
-cd ~/projects/my-project                # must have at least one commit
-noxdev init my-project --repo .         # register the project
-
+noxdev init my-project --repo ~/my-repo # register a project
 # write tasks in ~/worktrees/my-project/TASKS.md
 noxdev run my-project                   # run task loop
-noxdev status my-project                # project summary
+noxdev status my-project                # morning summary
 noxdev merge my-project                 # approve/reject commits
 noxdev dashboard                        # visual review UI
 ```
@@ -63,8 +60,8 @@ Tasks are defined in `TASKS.md` using this format:
 
 | Strategy | Behavior |
 |----------|----------|
-| `auto` | Auto-commit if verify passes and critic approves |
-| `gate` | Commit stays local, requires manual approval via `noxdev merge` |
+| `auto` | Auto-merge if verify passes and critic approves |
+| `gate` | Commit but require manual approval before merge |
 | `manual` | No auto-commit, human review required |
 
 ## Architecture
@@ -75,69 +72,61 @@ graph TB
     B --> C[Docker Container]
     C --> D[Claude Code Agent]
     D --> E[Git Commit]
-    E --> F[Review]
+    E --> F[Morning Review]
     F --> G[CLI/Dashboard]
     G --> H[Merge to Main]
 
     I[Safety Layers]
-    I --> J[Docker Isolation]
+    I --> J[Docker Containment]
     I --> K[Worktree Isolation]
     I --> L[Critic Agent]
     I --> M[Gated Push]
-    I --> N[No Auto-Merge to Main]
+    I --> N[No Auto-Push]
 ```
 
-The flow: **TASKS.md** → **noxdev CLI** → **Docker container** (Claude Code agent) → **git commit** → **review** (CLI or dashboard) → **merge to main**.
+The flow: **TASKS.md** → **noxdev CLI** → **Docker container** (Claude Code agent) → **git commit** → **morning review** (CLI or dashboard) → **merge to main**.
 
-Safety layers include Docker isolation, worktree separation, critic agent review, gated push controls, and nothing reaching main without your sign-off.
+Safety layers include Docker containment, worktree isolation, critic agent review, gated push controls, and a strict no auto-push policy.
 
 ## CLI Commands
 
 | Command | Description |
 |---------|-------------|
-| `noxdev init <project>` | Register a project with git repo path. Auto-detects default branch, auto-creates initial commit if empty. |
+| `noxdev init <project>` | Register a new project with git repo path |
 | `noxdev run <project>` | Execute pending tasks for a project |
-| `noxdev run --all` | Execute tasks across all registered projects sequentially |
-| `noxdev run --overnight` | Detached background mode. Frees terminal, prevents system sleep, writes PID file. |
-| `noxdev status <project>` | Show project status and last run summary |
-| `noxdev log <task-id>` | Full task detail: spec, agent logs, diff, duration |
-| `noxdev merge <project>` | Interactive per-commit approve/reject/diff/skip. Rejected commits are explicitly reverted. |
-| `noxdev projects` | List all registered projects with last run status |
-| `noxdev dashboard` | Launch React web UI for visual review (localhost:4400) |
-| `noxdev doctor` | Check all prerequisites (9 checks) |
-| `noxdev remove <project>` | Unregister project and clean up worktree |
+| `noxdev run --all` | Execute tasks across all registered projects |
+| `noxdev run --overnight` | Unattended mode with extended timeouts |
+| `noxdev status <project>` | Show project status and recent execution summary |
+| `noxdev log <project>` | View detailed execution history and logs |
+| `noxdev merge <project>` | Interactive commit review and merge workflow |
+| `noxdev projects` | List all registered projects |
+| `noxdev dashboard` | Launch web UI for visual review (localhost only) |
+| `noxdev doctor` | Check prerequisites and system health |
 
-## The Dashboard
+## The Morning Dashboard
 
-A React web interface for reviewing the work. Run `noxdev dashboard` to start the local server on port 4400. The dashboard shows execution summaries, commit diffs, and provides a visual merge review workflow with dark mode. Runs on localhost only.
+A React web interface for reviewing overnight work. Run `noxdev dashboard` to start the local server. The dashboard shows execution summaries, commit diffs, and provides a visual merge review workflow. Runs on localhost only for security.
 
 ## Safety Model
 
-- **Docker isolation**: Memory/CPU/timeout limits isolate agent execution
+- **Docker containment**: Memory/CPU/timeout limits isolate agent execution
 - **Git worktree**: Main branch is never directly modified, always safe
-- **Nothing reaches main without review**: All commits stay local until `noxdev merge`
+- **No auto-push ever**: All commits stay local until manual review
 - **Critic agent review**: Optional second-pass validation of changes
-- **Critic limitation — new files**: The critic reviews git diffs, so on greenfield projects where every file is new and untracked, the diff appears empty. This causes false rejections. Use `CRITIC: skip` for the first batch of tasks on any new project. Switch to `CRITIC: review` once there is tracked code to diff against.
 - **Circuit breaker**: 3 consecutive failures automatically pause a project
-- **SOPS + age encryption**: Secrets encrypted at rest, decrypted at container runtime only
-- **Auto-downgrade**: If any check fails on a `PUSH: auto` task, it downgrades to `gate`
+- **SOPS + age encryption**: Secure handling of secrets and credentials
 
 ## Requirements
 
 - Node.js >= 18
 - Docker (with daemon running)
 - Git
-- Claude Code CLI (`claude` installed and authenticated)
+- Claude CLI (`claude login` required)
 - SOPS + age (optional, for secrets encryption)
 
 ## Built With
 
-- TypeScript + commander.js (CLI)
-- React 18 + Vite + Tailwind CSS (dashboard)
-- better-sqlite3 (embedded database)
-- Express (dashboard API)
-- Battle-tested bash scripts for Docker orchestration
-- Turborepo + pnpm (monorepo)
+Built by a single developer using AI-augmented development.
 
 ## License
 

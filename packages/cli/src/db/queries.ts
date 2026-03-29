@@ -100,12 +100,20 @@ export function insertTaskResult(
     diffFile: string | null;
   },
 ): void {
+  // Determine merge decision based on push mode and status
+  const mergeDecision = (result.pushMode === 'auto' && (result.status === 'COMPLETED' || result.status === 'COMPLETED_RETRY'))
+    ? 'approved'
+    : 'pending';
+
+  // Set merged_at for auto-approved tasks
+  const mergedAt = mergeDecision === 'approved' ? new Date().toISOString() : null;
+
   db.prepare(
     `INSERT INTO task_results
      (run_id, task_id, title, status, exit_code, auth_mode, critic_mode, push_mode,
       attempt, commit_sha, started_at, finished_at, duration_seconds,
-      dev_log_file, critic_log_file, diff_file)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      dev_log_file, critic_log_file, diff_file, merge_decision, merged_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     result.runId,
     result.taskId,
@@ -123,6 +131,8 @@ export function insertTaskResult(
     result.devLogFile,
     result.criticLogFile,
     result.diffFile,
+    mergeDecision,
+    mergedAt,
   );
 }
 

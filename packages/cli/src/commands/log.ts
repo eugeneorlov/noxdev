@@ -34,14 +34,14 @@ interface TaskCacheRow {
 }
 
 function statusBadge(status: string): string {
-  switch (status.toUpperCase()) {
-    case "COMPLETED":
+  switch (status) {
+    case "completed":
       return chalk.green("COMPLETED");
-    case "FAILED":
+    case "failed":
       return chalk.red("FAILED");
-    case "SKIPPED":
+    case "skipped":
       return chalk.yellow("SKIPPED");
-    case "COMPLETED_RETRY":
+    case "completed_retry":
       return chalk.green("COMPLETED") + chalk.green(" (retry)");
     default:
       return status.toUpperCase();
