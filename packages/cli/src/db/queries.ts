@@ -143,7 +143,7 @@ export function updateMergeDecision(
   mergedAt?: string,
 ): void {
   db.prepare(
-    `UPDATE task_results SET merge_decision = ?, merged_at = ? WHERE id = ?`,
+    `UPDATE task_results SET merge_decision = LOWER(?), merged_at = ? WHERE id = ?`,
   ).run(decision, mergedAt ?? null, taskResultId);
 }
 
@@ -161,7 +161,7 @@ export function getTaskResults(db: Database.Database, runId: string) {
 
 export function getPendingMerge(db: Database.Database, runId: string) {
   return db
-    .prepare(`SELECT * FROM task_results WHERE run_id = ? AND merge_decision = 'pending'`)
+    .prepare(`SELECT * FROM task_results WHERE run_id = ? AND LOWER(merge_decision) = 'pending'`)
     .all(runId);
 }
 

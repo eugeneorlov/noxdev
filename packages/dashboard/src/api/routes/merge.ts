@@ -15,7 +15,7 @@ router.post('/:projectId', (req, res) => {
       SELECT tr.run_id, tr.task_id, tr.diff_file
       FROM task_results tr
       JOIN runs r ON tr.run_id = r.id
-      WHERE r.project_id = ? AND tr.merge_decision = 'approved' AND tr.merged_at IS NOT NULL
+      WHERE r.project_id = ? AND LOWER(tr.merge_decision) = 'approved' AND tr.merged_at IS NOT NULL
     `;
 
     const approvedTasks = db.prepare(approvedTasksQuery).all(projectId);

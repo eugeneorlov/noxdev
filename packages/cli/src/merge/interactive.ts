@@ -43,8 +43,8 @@ export function getMergeCandidates(
       `SELECT id, task_id, title, status, commit_sha, diff_file
        FROM task_results
        WHERE run_id = ?
-         AND status IN ('completed', 'completed_retry')
-         AND merge_decision = 'pending'
+         AND UPPER(status) IN ('COMPLETED', 'COMPLETED_RETRY')
+         AND LOWER(merge_decision) = 'pending'
          AND commit_sha IS NOT NULL`,
     )
     .all(run.id) as TaskResultRow[];
@@ -71,8 +71,8 @@ export function getAutoApprovedTasks(
       `SELECT id, task_id, title, status, commit_sha, diff_file
        FROM task_results
        WHERE run_id = ?
-         AND status IN ('completed', 'completed_retry')
-         AND merge_decision = 'approved'
+         AND UPPER(status) IN ('COMPLETED', 'COMPLETED_RETRY')
+         AND LOWER(merge_decision) = 'approved'
          AND commit_sha IS NOT NULL`,
     )
     .all(run.id) as TaskResultRow[];

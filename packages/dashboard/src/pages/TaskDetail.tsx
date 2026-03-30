@@ -241,7 +241,7 @@ export default function TaskDetail() {
                 {getMergeDecisionBadge(task.merge_decision)}
               </div>
 
-              {task.merge_decision === 'pending' && (
+              {task.merge_decision?.toLowerCase() === 'pending' && (
                 <div>
                   <div className="flex gap-2">
                     <button

@@ -163,7 +163,7 @@ router.post('/:id/tasks/:taskId/merge', (req, res) => {
     // Update merge decision
     const updateQuery = `
       UPDATE task_results
-      SET merge_decision = ?, merged_at = datetime('now')
+      SET merge_decision = LOWER(?), merged_at = datetime('now')
       WHERE run_id = ? AND task_id = ?
     `;
 

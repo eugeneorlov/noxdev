@@ -82,9 +82,9 @@ export default function MergeReview() {
   // Filter pending tasks
   const pendingTasks = run?.task_results?.filter(
     task =>
-      task.merge_decision === 'pending' &&
+      task.merge_decision?.toLowerCase() === 'pending' &&
       task.commit_sha !== null &&
-      (task.status === 'COMPLETED' || task.status === 'COMPLETED_RETRY')
+      (task.status?.toUpperCase() === 'COMPLETED' || task.status?.toUpperCase() === 'COMPLETED_RETRY')
   ) || [];
 
   const formatDuration = (seconds: number | null): string => {

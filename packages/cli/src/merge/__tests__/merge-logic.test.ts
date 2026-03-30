@@ -128,7 +128,7 @@ describe("getMergeCandidates", () => {
     });
 
     // Mark as approved
-    db.prepare(`UPDATE task_results SET merge_decision = 'approved' WHERE task_id = 'T1'`).run();
+    db.prepare(`UPDATE task_results SET merge_decision = LOWER('approved') WHERE task_id = 'T1'`).run();
 
     const candidates = getMergeCandidates(db, "proj-1");
     expect(candidates).toHaveLength(0);
