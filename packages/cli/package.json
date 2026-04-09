@@ -24,6 +24,7 @@
   "files": [
     "dist/",
     "scripts/",
+    "docker/",
     "README.md",
     "LICENSE"
   ],
