@@ -118,7 +118,7 @@ A React web interface for reviewing overnight work. Run `noxdev dashboard` to st
 
 ## Requirements
 
-- Node.js >= 18
+- Node.js >= 20 < 23
 - Docker (with daemon running)
 - Git
 - Claude CLI (`claude login` required)

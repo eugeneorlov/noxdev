@@ -19,7 +19,7 @@
   },
   "homepage": "https://github.com/eugeneorlov/noxdev",
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=20.0.0 <23.0.0"
   },
   "files": [
     "dist/",
@@ -32,6 +32,7 @@
     "noxdev": "./dist/index.js"
   },
   "scripts": {
+    "prebuild": "mkdir -p docker && cp ../../docker/Dockerfile docker/Dockerfile",
     "build": "tsup",
     "postbuild": "rm -rf dist/scripts && cp -r scripts dist/scripts && rm -rf dist/dashboard && cp -r ../dashboard/dist dist/dashboard",
     "lint": "tsc --noEmit",
