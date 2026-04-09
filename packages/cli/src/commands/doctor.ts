@@ -80,10 +80,10 @@ export function registerDoctor(program: Command): void {
           if (output) {
             return { passed: true };
           } else {
-            return { passed: false, message: "noxdev-runner image not found. Build it with: docker build -t noxdev-runner ." };
+            return { passed: false, message: "noxdev-runner image not found. Run: noxdev setup" };
           }
         } catch {
-          return { passed: false, message: "noxdev-runner image not found. Build it with: docker build -t noxdev-runner ." };
+          return { passed: false, message: "noxdev-runner image not found. Run: noxdev setup" };
         }
       }));
 
@@ -93,7 +93,7 @@ export function registerDoctor(program: Command): void {
         if (existsSync(configDir)) {
           return { passed: true };
         } else {
-          return { passed: false, message: "No config directory. Run: noxdev init <project>" };
+          return { passed: false, message: "No config directory. Run: noxdev setup" };
         }
       }));
 
@@ -101,7 +101,7 @@ export function registerDoctor(program: Command): void {
       checks.push(runCheck("SQLite database", false, () => {
         const dbPath = join(homedir(), ".noxdev", "ledger.db");
         if (!existsSync(dbPath)) {
-          return { passed: false, message: "No database. Run: noxdev init <project>" };
+          return { passed: false, message: "No database. Run: noxdev setup" };
         }
 
         try {
@@ -110,7 +110,7 @@ export function registerDoctor(program: Command): void {
           db.close();
           return { passed: true, message: `${result.count} projects registered` };
         } catch {
-          return { passed: false, message: "No database. Run: noxdev init <project>" };
+          return { passed: false, message: "No database. Run: noxdev setup" };
         }
       }));
 
