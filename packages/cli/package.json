@@ -25,6 +25,7 @@
     "dist/",
     "scripts/",
     "docker/",
+    "templates/",
     "README.md",
     "LICENSE"
   ],
