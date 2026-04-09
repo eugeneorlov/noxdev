@@ -15,6 +15,22 @@ import chalk from "chalk";
 import ora from "ora";
 import { getDb } from "../db/index.js";
 import type { ProjectConfig } from "../config/types.js";
+import { demoTasksPath } from '../lib/paths.js';
+
+
+function dumpErr(err: unknown): void {
+     if (err && typeof err === 'object') {
+       const e = err as { stderr?: Buffer; stdout?: Buffer };
+       if (e.stderr?.length) {
+         console.error(chalk.gray('  ─ stderr ─'));
+         console.error(chalk.gray('  ' + e.stderr.toString().trim().replace(/\n/g, '\n  ')));
+       }
+       if (e.stdout?.length) {
+         console.error(chalk.gray('  ─ stdout ─'));
+         console.error(chalk.gray('  ' + e.stdout.toString().trim().replace(/\n/g, '\n  ')));
+       }
+     }
+   }
 
 export function registerDemo(program: Command): void {
   program
@@ -36,7 +52,7 @@ export function registerDemo(program: Command): void {
 }
 
 async function runDemo(opts: { fresh?: boolean } = {}): Promise<void> {
-  console.log(chalk.bold('\n🎭 noxdev demo\n'));
+  console.log(chalk.bold('\n🦉 noxdev demo\n'));
 
   const projectName = "noxdev-demo";
   const tempDir = join(tmpdir(), projectName);
@@ -122,11 +138,12 @@ async function runDemo(opts: { fresh?: boolean } = {}): Promise<void> {
     // Create project with Vite
     execSync(`npm create vite@latest ${projectName} -- --template react-ts`, {
       cwd: tmpdir(),
-      stdio: 'pipe'
+      stdio: ['pipe', 'pipe', 'pipe']
     });
     spinner.succeed('Vite project scaffolded');
   } catch (err: unknown) {
     spinner.fail('Failed to scaffold Vite project');
+    dumpErr(err);
     throw err;
   }
 
@@ -136,19 +153,20 @@ async function runDemo(opts: { fresh?: boolean } = {}): Promise<void> {
   const gitSpinner = ora('Setting up git...').start();
   try {
     // Initialize git repo
-    execSync('git init', { cwd: tempDir, stdio: 'pipe' });
+    execSync('git init', { cwd: tempDir, stdio: ['pipe', 'pipe', 'pipe'] });
 
     // Set git identity
-    execSync('git config user.name "noxdev"', { cwd: tempDir, stdio: 'pipe' });
-    execSync('git config user.email "noxdev@demo"', { cwd: tempDir, stdio: 'pipe' });
+    execSync('git config user.name "noxdev"', { cwd: tempDir, stdio: ['pipe', 'pipe', 'pipe'] });
+    execSync('git config user.email "noxdev@demo"', { cwd: tempDir, stdio: ['pipe', 'pipe', 'pipe'] });
 
     // Add and commit initial files
-    execSync('git add .', { cwd: tempDir, stdio: 'pipe' });
-    execSync('git commit -m "Initial Vite scaffold"', { cwd: tempDir, stdio: 'pipe' });
+    execSync('git add .', { cwd: tempDir, stdio: ['pipe', 'pipe', 'pipe'] });
+    execSync('git commit -m "Initial Vite scaffold"', { cwd: tempDir, stdio: ['pipe', 'pipe', 'pipe'] });
 
     gitSpinner.succeed('Git repository initialized');
   } catch (err: unknown) {
     gitSpinner.fail('Failed to initialize git repository');
+    dumpErr(err);
     throw err;
   }
 
@@ -165,7 +183,7 @@ async function runDemo(opts: { fresh?: boolean } = {}): Promise<void> {
 
     execSync(`git worktree add -b ${branch} ${worktreePath} ${defaultBranch}`, {
       cwd: tempDir,
-      stdio: 'pipe'
+      stdio: ['pipe', 'pipe', 'pipe']
     });
 
     // Create .noxdev/config.json
@@ -210,6 +228,7 @@ async function runDemo(opts: { fresh?: boolean } = {}): Promise<void> {
     registerSpinner.succeed('Project registered with noxdev');
   } catch (err: unknown) {
     registerSpinner.fail('Failed to register project');
+    dumpErr(err);
     throw err;
   }
 
@@ -218,16 +237,12 @@ async function runDemo(opts: { fresh?: boolean } = {}): Promise<void> {
 
   const tasksSpinner = ora('Copying demo tasks template...').start();
   try {
-    // Find the templates directory (relative to this file)
-    const templatesDir = join(import.meta.dirname, "../../../templates");
-    const demoTasksPath = join(templatesDir, "demo-tasks.md");
     const targetTasksPath = join(worktreePath, "TASKS.md");
-
-    copyFileSync(demoTasksPath, targetTasksPath);
-
+    copyFileSync(demoTasksPath(), targetTasksPath);
     tasksSpinner.succeed('Demo tasks copied');
   } catch (err: unknown) {
     tasksSpinner.fail('Failed to copy demo tasks');
+    dumpErr(err);
     throw err;
   }
 
@@ -236,16 +251,17 @@ async function runDemo(opts: { fresh?: boolean } = {}): Promise<void> {
 
   const depsSpinner = ora('Installing dependencies with pnpm...').start();
   try {
-    execSync('pnpm install', { cwd: worktreePath, stdio: 'pipe' });
+    execSync('pnpm install', { cwd: worktreePath, stdio: ['pipe', 'pipe', 'pipe'] });
     depsSpinner.succeed('Dependencies installed');
   } catch (err: unknown) {
     depsSpinner.fail('Failed to install dependencies');
+    dumpErr(err);
     throw err;
   }
 
   // Step 7: Run noxdev on the project
   console.log(chalk.bold('\nStep 7: Running noxdev demo tasks autonomously'));
-  console.log(chalk.cyan('🤖 Launching autonomous agent...\n'));
+  console.log(chalk.cyan('🦉 Launching autonomous agent...\n'));
 
   try {
     // Import and execute the run logic
@@ -265,6 +281,7 @@ async function runDemo(opts: { fresh?: boolean } = {}): Promise<void> {
 
   } catch (err: unknown) {
     console.error(chalk.red('Failed to run noxdev tasks:'), err instanceof Error ? err.message : String(err));
+    dumpErr(err);
     throw err;
   }
 
@@ -339,8 +356,8 @@ async function runSingleProject(project: {
 
   // Auto-commit TASKS.md status updates
   try {
-    execSync('git add TASKS.md', { cwd: project.worktree_path, stdio: 'pipe' });
-    execSync('git commit -m "noxdev: update task statuses"', { cwd: project.worktree_path, stdio: 'pipe' });
+    execSync('git add TASKS.md', { cwd: project.worktree_path, stdio: ['pipe', 'pipe', 'pipe'] });
+    execSync('git commit -m "noxdev: update task statuses"', { cwd: project.worktree_path, stdio: ['pipe', 'pipe', 'pipe'] });
     console.log(chalk.gray('  ✓ TASKS.md status updates committed'));
   } catch {
     // Silently ignore — TASKS.md might not have changes

@@ -5,6 +5,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { createInterface } from "node:readline";
+import { dockerfilePath } from '../lib/paths.js';
 
 interface SetupOptions {
   rebuild?: boolean;
@@ -40,10 +41,29 @@ async function runSetup(opts: SetupOptions = {}): Promise<void> {
   // 1. Node version check
   const nodeVersion = process.versions.node;
   const major = parseInt(nodeVersion.split('.')[0]);
-  if (major < 20 || major >= 23) {
-    console.error(chalk.red(`✖ Node ${nodeVersion} not supported. Install Node 20 or 22 LTS.`));
+  //if (major < 20 || major >= 23) {
+  //  console.error(chalk.red(`✖ Node ${nodeVersion} not supported. Install Node 20 or 22 LTS.`));
+  //  process.exit(1);
+  //}
+  
+  if (major < 20) {
+    console.error(chalk.red(`✖ Node ${process.versions.node} is too old. noxdev requires Node 20 or newer.`));
     process.exit(1);
   }
+
+  if (major >= 25) {
+    console.error(chalk.red(`✖ Node ${process.versions.node} is not supported.`));
+    console.error(chalk.gray('  noxdev depends on better-sqlite3 which lacks prebuilt binaries for Node 25+.'));
+    console.error(chalk.gray('  Install Node 22 LTS: brew install node@22 (macOS) or nvm install 22'));
+    process.exit(1);
+  }
+
+  if (major > 22) {
+    console.warn(chalk.yellow(`⚠ Node ${process.versions.node} is untested (supported: 20.x, 22.x LTS).`));
+    console.warn(chalk.gray('  Continuing anyway. Report issues at github.com/eugeneorlov/noxdev/issues'));
+    // Continue, do NOT exit
+  }
+  
   console.log(chalk.green(`✓ Node ${nodeVersion} (supported)`));
 
   // 2. Docker installed check
@@ -108,12 +128,11 @@ async function runSetup(opts: SetupOptions = {}): Promise<void> {
     }
   }
 
-  // STEP C: Build Docker image (idempotent)
-  const cliRoot = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..', '..');
-  const dockerfilePath = path.join(cliRoot, 'docker', 'Dockerfile');
+  // STEP C: Build Docker image (idempotent)  
+  const dockerfileLocation = dockerfilePath();
 
-  if (!fs.existsSync(dockerfilePath)) {
-    console.error(chalk.red('✖ Dockerfile not found at ' + dockerfilePath));
+  if (!fs.existsSync(dockerfileLocation)) {
+    console.error(chalk.red('✖ Dockerfile not found at ' + dockerfileLocation));
     console.error(chalk.gray('  This is a noxdev install bug. Reinstall with:'));
     console.error(chalk.gray('  npm install -g @eugene218/noxdev'));
     process.exit(1);
@@ -131,7 +150,7 @@ async function runSetup(opts: SetupOptions = {}): Promise<void> {
   if (imageExists && !opts.rebuild) {
     console.log(chalk.green('\n✓ Docker image already exists (use --rebuild to force)'));
   } else {
-    const dockerfileDir = path.dirname(dockerfilePath);
+    const dockerfileDir = path.dirname(dockerfileLocation);
     console.log(chalk.cyan('\nBuilding noxdev-runner image (this takes 3-5 minutes)...\n'));
     const result = spawnSync('docker', ['build', '-t', 'noxdev-runner:latest', dockerfileDir], {
       stdio: 'inherit',
