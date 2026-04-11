@@ -139,7 +139,27 @@ export function registerDoctor(program: Command): void {
         }
       }));
 
-      // 9. Claude credentials
+      // 9. Python3 version (informational)
+      checks.push(runCheck("Python3 version", false, () => {
+        try {
+          const output = execSync("python3 --version", { encoding: "utf8" }).trim();
+          return { passed: true, message: output };
+        } catch {
+          return { passed: false, message: "python3 not found (not required for noxdev - available in Docker)" };
+        }
+      }));
+
+      // 10. uv version (informational)
+      checks.push(runCheck("uv version", false, () => {
+        try {
+          const output = execSync("uv --version", { encoding: "utf8" }).trim();
+          return { passed: true, message: output };
+        } catch {
+          return { passed: false, message: "uv not found (not required for noxdev - available in Docker)" };
+        }
+      }));
+
+      // 11. Claude credentials
       checks.push(runCheck("Claude credentials", true, () => {
         const claudePath = join(homedir(), ".claude.json");
         if (existsSync(claudePath)) {
