@@ -125,7 +125,7 @@
   and confirming the generated config has uv commands.
 
 ## T3: Support compound commands in noxdev run (frontend && backend)
-- STATUS: pending
+- STATUS: done
 - FILES: packages/cli/src/engine/orchestrator.ts
 - VERIFY: cd packages/cli && pnpm build
 - CRITIC: skip
@@ -153,7 +153,7 @@
   Step 3: No new code if it already works. Just confirm and document.
 
 ## T4: Rewrite noxdev demo to scaffold fullstack React + FastAPI app
-- STATUS: pending
+- STATUS: done
 - FILES: packages/cli/src/commands/demo.ts
 - VERIFY: cd packages/cli && pnpm build && node dist/index.js demo --help
 - CRITIC: skip
