@@ -23,7 +23,7 @@ import { dumpErr } from '../lib/errors.js';
 export function registerDemo(program: Command): void {
   program
     .command("demo")
-    .description("Scaffold a fresh Vite + React + TypeScript project and run noxdev demo tasks")
+    .description("Scaffold a fullstack React + FastAPI application and run noxdev demo tasks")
     .action(async () => {
       try {
         await runDemo();
@@ -76,10 +76,10 @@ async function runDemo(): Promise<void> {
   }
 
   console.log(chalk.cyan('This demo will:'));
-  console.log(chalk.gray('  • Scaffold a fresh Vite + React + TypeScript project'));
+  console.log(chalk.gray('  • Scaffold a fullstack React frontend + FastAPI backend'));
   console.log(chalk.gray('  • Register it with noxdev'));
   console.log(chalk.gray('  • Copy demo tasks and run them autonomously'));
-  console.log(chalk.gray('  • Show you the completed result\n'));
+  console.log(chalk.gray('  • Show you the completed fullstack todo app\n'));
 
   // Step 1: Check prerequisites
   console.log(chalk.bold('Step 1: Checking prerequisites'));
@@ -104,19 +104,73 @@ async function runDemo(): Promise<void> {
   }
   console.log(chalk.green('✓ Docker image noxdev-runner:latest found'));
 
-  // Step 2: Scaffold Vite project
-  console.log(chalk.bold('\nStep 2: Scaffolding Vite + React + TypeScript project'));
+  // Step 2: Scaffold fullstack project
+  console.log(chalk.bold('\nStep 2: Scaffolding fullstack React + FastAPI project'));
 
-  const spinner = ora('Creating Vite project...').start();
+  const spinner = ora('Creating project structure...').start();
   try {
-    // Create project with Vite
-    execSync(`pnpm dlx create-vite@latest ${projectName} --template react-ts`, {
-      cwd: tmpdir(),
+    // Create root project directory
+    mkdirSync(tempDir, { recursive: true });
+
+    // Create frontend with Vite React TypeScript template
+    const frontendPath = join(tempDir, 'frontend');
+    execSync(`pnpm dlx create-vite@latest frontend --template react-ts`, {
+      cwd: tempDir,
       stdio: ['pipe', 'pipe', 'pipe']
     });
-    spinner.succeed('Vite project scaffolded');
+
+    // Create backend directory and basic FastAPI structure
+    const backendPath = join(tempDir, 'backend');
+    mkdirSync(backendPath, { recursive: true });
+
+    // Create basic FastAPI main.py
+    const fastApiContent = `from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+@app.get("/")
+def read_root():
+    return {"message": "FastAPI backend is running"}
+
+@app.get("/health")
+def health_check():
+    return {"status": "healthy"}
+`;
+    writeFileSync(join(backendPath, 'main.py'), fastApiContent);
+
+    // Create basic requirements.txt
+    const requirementsContent = `fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+`;
+    writeFileSync(join(backendPath, 'requirements.txt'), requirementsContent);
+
+    // Create root package.json for workspace
+    const rootPackageJson = {
+      name: projectName,
+      private: true,
+      workspaces: ["frontend", "backend"],
+      scripts: {
+        "dev:frontend": "cd frontend && pnpm dev",
+        "dev:backend": "cd backend && uvicorn main:app --reload --port 8000",
+        "build:frontend": "cd frontend && pnpm build",
+        "test": "cd frontend && pnpm build"
+      },
+      devDependencies: {}
+    };
+    writeFileSync(join(tempDir, 'package.json'), JSON.stringify(rootPackageJson, null, 2));
+
+    spinner.succeed('Fullstack project scaffolded');
   } catch (err: unknown) {
-    spinner.fail('Failed to scaffold Vite project');
+    spinner.fail('Failed to scaffold fullstack project');
     dumpErr(err);
     throw err;
   }
@@ -165,8 +219,8 @@ async function runDemo(): Promise<void> {
       project: projectName,
       display_name: projectName,
       test_command: "pnpm test",
-      build_command: "pnpm build",
-      lint_command: "pnpm lint",
+      build_command: "pnpm build:frontend",
+      lint_command: "cd frontend && pnpm lint",
       docker: {
         memory: "4g",
         cpus: 2,
@@ -195,8 +249,8 @@ async function runDemo(): Promise<void> {
       worktreePath,
       branch,
       "pnpm test",
-      "pnpm build",
-      "pnpm lint"
+      "pnpm build:frontend",
+      "cd frontend && pnpm lint"
     );
 
     registerSpinner.succeed('Project registered with noxdev');
@@ -262,23 +316,25 @@ async function runDemo(): Promise<void> {
   // Step 8: Show results
   console.log(chalk.bold('\n🎉 Demo complete!'));
   console.log('');
-  console.log(chalk.green('✓ Vite + React + TypeScript project scaffolded'));
+  console.log(chalk.green('✓ Fullstack React + FastAPI project scaffolded'));
   console.log(chalk.green('✓ Git repository initialized'));
   console.log(chalk.green('✓ Project registered with noxdev'));
   console.log(chalk.green('✓ Demo tasks executed autonomously'));
   console.log('');
   console.log(chalk.bold('What happened:'));
   console.log(chalk.gray('  • noxdev read the task specifications in TASKS.md'));
-  console.log(chalk.gray('  • Claude Code built the welcome page according to specs'));
+  console.log(chalk.gray('  • Claude Code built the todo app according to specs'));
+  console.log(chalk.gray('  • Frontend, backend, and tests were created automatically'));
   console.log(chalk.gray('  • All changes were committed automatically'));
   console.log('');
   console.log(chalk.bold('Next steps:'));
-  console.log(chalk.gray(`  • View the result: cd ${worktreePath} && pnpm dev`));
+  console.log(chalk.gray(`  • Start frontend: cd ${worktreePath} && pnpm dev:frontend`));
+  console.log(chalk.gray(`  • Start backend: cd ${worktreePath} && pnpm dev:backend`));
   console.log(chalk.gray(`  • See the tasks: cat ${worktreePath}/TASKS.md`));
   console.log(chalk.gray(`  • Run more tasks: noxdev run ${projectName}`));
   console.log(chalk.gray('  • Review changes: noxdev dashboard'));
   console.log('');
-  console.log(chalk.cyan('🦉 Welcome to autonomous development with noxdev!'));
+  console.log(chalk.cyan('🦉 Welcome to fullstack autonomous development with noxdev!'));
 }
 
 // Helper function to run a single project (extracted from run.ts logic)

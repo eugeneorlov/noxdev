@@ -1,168 +1,107 @@
-# noxdev demo — your first autonomous build
+# noxdev demo — fullstack React + FastAPI scaffold
 
-# This is a baked-in demo task spec shipped with noxdev.
-# It transforms a fresh Vite + React + TypeScript scaffold into a
-# polished welcome page, built entirely by an autonomous agent.
+# This is a demo task spec for a fullstack React + FastAPI application.
+# It transforms a basic fullstack scaffold into a working todo app with
+# frontend-backend communication, built entirely by an autonomous agent.
 #
-# Estimated runtime: 2-3 minutes total
-# Gate: pnpm build must pass after each task
+# Estimated runtime: 4-5 minutes total
+# Gate: cd frontend && pnpm build && cd ../backend && python -m pytest must pass
 
-## T1: Replace the Vite starter App with a noxdev welcome page
+## T1: Create FastAPI backend with todos endpoint
 - STATUS: pending
-- FILES: src/App.tsx, src/App.css
-- VERIFY: pnpm build && grep -q "noxdev" src/App.tsx && ! grep -q "viteLogo" src/App.tsx
+- FILES: backend/main.py, backend/requirements.txt, backend/test_main.py
+- VERIFY: cd backend && python -c "import main" && grep -q "todos" main.py
 - CRITIC: skip
 - PUSH: auto
-- SPEC: Replace the contents of src/App.tsx and src/App.css to create a
-  centered welcome page that demonstrates noxdev's spec-driven workflow.
+- SPEC: Create a FastAPI backend that serves a todos API.
 
-  REQUIREMENTS for src/App.tsx:
-  - Remove ALL Vite starter content: viteLogo import, reactLogo import,
-    useState counter, the entire default JSX with logos and counter button.
-  - Do NOT keep any reference to viteLogo, reactLogo, or the count state.
-  - Replace with a single functional component that renders:
-    - A main container div with className "app-container"
-    - An owl emoji 🦉 inside a div with className "app-owl"
-    - An h1 with the text "noxdev demo"
-    - A subtitle paragraph with className "app-subtitle":
-      "This page was built by an autonomous agent while you watched."
-    - A "What just happened" section with className "app-explainer":
-      - h2 with text "What just happened?"
-      - A paragraph explaining: "You ran one command. noxdev spun up a
-        Docker container, fed a task spec to Claude Code, captured the
-        diff, and committed the result. No clicks. No typing. Just specs."
-    - A footer paragraph with className "app-footer":
-      "Welcome to spec-driven development."
+  REQUIREMENTS for backend/main.py:
+  - Import FastAPI, create app instance
+  - Add CORS middleware to allow frontend on localhost:5173
+  - Create an in-memory todos list with sample data:
+    [{"id": 1, "text": "Learn noxdev", "completed": False}]
+  - Implement GET /api/todos endpoint that returns the todos list
+  - Implement POST /api/todos endpoint that accepts {"text": string}
+    and adds a new todo with incremented ID
+  - Implement PATCH /api/todos/{todo_id} endpoint that toggles completed status
+  - Add proper type hints using Pydantic BaseModel for request/response
+  - Include proper error handling for 404s
 
-  REQUIREMENTS for src/App.css:
-  - Replace the ENTIRE file. Remove all default Vite styles.
-  - Use CSS variables at the top for the color palette:
-    --bg: #0a0a12 (deep near-black)
-    --surface: #161623
-    --text: #e4e4ef
-    --muted: #9494a8
-    --gold: #C9A84C (noxdev brand color)
-    --border: #2a2a3e
-  - Body / .app-container styles:
-    - body: background var(--bg), color var(--text), system font stack
-      (-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif)
-    - margin 0, min-height 100vh
-    - .app-container: max-width 640px, margin 0 auto, padding 80px 24px,
-      text-align center
-  - .app-owl: font-size 80px, margin-bottom 24px, line-height 1
-  - h1: font-size 48px, font-weight 700, color var(--gold),
-    margin 0 0 16px 0, letter-spacing -0.02em
-  - .app-subtitle: font-size 18px, color var(--muted), margin 0 0 64px 0,
-    line-height 1.5
-  - .app-explainer: background var(--surface), border 1px solid var(--border),
-    border-radius 12px, padding 32px, margin-bottom 48px, text-align left
-  - .app-explainer h2: font-size 20px, color var(--gold),
-    margin 0 0 12px 0, font-weight 600
-  - .app-explainer p: font-size 15px, color var(--text), margin 0,
-    line-height 1.6
-  - .app-footer: font-size 14px, color var(--muted), font-style italic,
-    margin 0
+  REQUIREMENTS for backend/requirements.txt:
+  - fastapi>=0.104.0
+  - uvicorn[standard]>=0.24.0
+  - pytest>=7.4.0
+  - httpx>=0.25.0  # for testing
 
-  Do NOT add any imports beyond React. Do NOT add useState, useEffect,
-  or any hooks. This is a purely static welcome page.
-  Do NOT delete src/main.tsx or src/index.css — leave those alone.
+  REQUIREMENTS for backend/test_main.py:
+  - Import pytest, httpx, and main.py app
+  - Create TestClient instance
+  - Test GET /api/todos returns initial todo
+  - Test POST /api/todos creates new todo
+  - Test PATCH /api/todos/{id} toggles completion
 
-## T2: Clean up Vite starter assets
+## T2: Build React frontend with todo interface
 - STATUS: pending
-- FILES: src/index.css, public/vite.svg, src/assets/react.svg
-- VERIFY: pnpm build && ! grep -q "vite.svg" index.html
+- FILES: frontend/src/App.tsx, frontend/src/App.css, frontend/package.json
+- VERIFY: cd frontend && pnpm build && grep -q "localhost:8000" src/App.tsx
 - CRITIC: skip
 - PUSH: auto
-- SPEC: Remove the leftover Vite starter assets and update index.css.
+- SPEC: Create a React frontend that communicates with the FastAPI backend.
 
-  STEPS:
-  1. Replace the contents of src/index.css with a minimal reset:
-```css
-     :root {
-       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
-                    Roboto, Oxygen, Ubuntu, sans-serif;
-       line-height: 1.5;
-       font-weight: 400;
-       color-scheme: dark;
-     }
-     * {
-       box-sizing: border-box;
-     }
-     body {
-       margin: 0;
-       min-width: 320px;
-       min-height: 100vh;
-     }
-```
-  2. Delete the file public/vite.svg (it is no longer used).
-     Use rm public/vite.svg
-  3. Delete the file src/assets/react.svg (it is no longer used).
-     Use rm src/assets/react.svg
-  4. If src/assets/ is now empty, remove it with rmdir src/assets
-  5. Update index.html in the project root: change the <link rel="icon">
-     line from href="/vite.svg" to href="data:," (an empty data URI).
-     This removes the broken favicon reference without needing a new file.
-  6. Update the <title> in index.html from "Vite + React + TS" to
-     "noxdev demo".
+  REQUIREMENTS for frontend/src/App.tsx:
+  - Replace default Vite content completely
+  - Use useState and useEffect hooks for state management
+  - Create interface for Todo: {id: number, text: string, completed: boolean}
+  - Fetch todos from http://localhost:8000/api/todos on component mount
+  - Render todos list with checkboxes to toggle completion
+  - Add input form to create new todos via POST to backend
+  - Include error handling for network requests
+  - Use proper TypeScript types throughout
+  - Style with CSS classes: app-container, todo-list, todo-item, add-form
 
-  Do NOT touch src/main.tsx, package.json, vite.config.ts, or tsconfig.json.
+  REQUIREMENTS for frontend/src/App.css:
+  - Dark theme with CSS variables:
+    --bg: #0a0a12, --surface: #1a1a2e, --text: #e4e4ef
+    --primary: #4a9eff, --success: #4caf50, --border: #2a2a3e
+  - .app-container: max-width 600px, margin 0 auto, padding 24px
+  - .todo-item: flex layout, padding 12px, border-radius 8px, margin 8px 0
+  - .add-form: flex input and button, margin 24px 0
+  - Responsive design, clean typography
 
-## T3: Add a brief README explaining what noxdev built
+  REQUIREMENTS for frontend/package.json:
+  - Add proxy field: "proxy": "http://localhost:8000"
+  - Ensure dev script starts on port 5173
+
+## T3: Add development scripts and documentation
 - STATUS: pending
-- FILES: README.md
-- VERIFY: pnpm build && grep -q "noxdev" README.md
+- FILES: package.json, README.md, backend/.env.example
+- VERIFY: grep -q "dev:frontend" package.json && grep -q "fullstack" README.md
 - CRITIC: skip
 - PUSH: auto
-- SPEC: Replace the default Vite README.md with a short explanation of
-  what just happened in this demo.
+- SPEC: Add workspace scripts and comprehensive documentation.
 
-  Replace the entire contents of README.md with exactly this markdown:
+  REQUIREMENTS for package.json (root):
+  - Create workspace with "workspaces": ["frontend", "backend"]
+  - Add scripts:
+    - "dev:frontend": "cd frontend && pnpm dev"
+    - "dev:backend": "cd backend && uvicorn main:app --reload --port 8000"
+    - "dev": "concurrently \"pnpm dev:backend\" \"pnpm dev:frontend\""
+    - "build:frontend": "cd frontend && pnpm build"
+    - "test:backend": "cd backend && python -m pytest"
+    - "test": "pnpm test:backend && pnpm build:frontend"
+  - Add concurrently to devDependencies
 
-  # noxdev demo
+  REQUIREMENTS for README.md:
+  - Replace entire content with fullstack project documentation
+  - Include "noxdev demo - fullstack" title
+  - Explain what noxdev built: React frontend + FastAPI backend todo app
+  - Include setup instructions for both frontend and backend
+  - Document the API endpoints
+  - Include development workflow with pnpm commands
+  - Mention this was built autonomously by noxdev
 
-  This project was built by an autonomous agent using
-  [noxdev](https://github.com/eugeneorlov/noxdev).
-
-  ## What happened
-
-  You ran `noxdev demo`. noxdev:
-
-  1. Scaffolded a fresh Vite + React + TypeScript project
-  2. Initialized a git repository with an initial commit
-  3. Registered the project with noxdev
-  4. Spun up a Docker container with Claude Code inside
-  5. Fed a task spec to the agent
-  6. Captured the resulting diff
-  7. Committed the changes to a worktree branch
-
-  All without you typing a single line of code.
-
-  ## Run it locally
-
-```bash
-  pnpm install
-  pnpm dev
-```
-
-  Open http://localhost:5173 in your browser.
-
-  ## What is spec-driven development?
-
-  Instead of writing code, you write specifications. A specification
-  describes what the agent should build, which files to touch, and how
-  to verify the result. The agent reads the spec and produces code.
-
-  See `TASKS.md` in the project root for the specs that built this page.
-
-  ## Next steps
-
-  - Edit `TASKS.md` to add your own task
-  - Run `noxdev run noxdev-demo` to execute new tasks
-  - Run `noxdev dashboard` to see the visual review interface
-  - Read the noxdev docs to learn the full workflow
-
-  ---
-
-  *Built with noxdev. Ship code while you sleep.* 🦉
-
-  Do NOT touch any other files.
+  REQUIREMENTS for backend/.env.example:
+  - Add example environment variables
+  - DATABASE_URL=sqlite:///./todos.db
+  - API_PORT=8000
+  - CORS_ORIGINS=http://localhost:5173
