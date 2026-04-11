@@ -91,6 +91,8 @@ export function showProjectStatus(db: Database.Database, projectId: string): voi
   if (run.status === "running") {
     console.log(`Run ${run.id} · ${timeStr} · ${chalk.cyan("running")}`);
     console.log(chalk.cyan(`Run in progress since ${timeStr}...`));
+  } else if (run.status === "aborted") {
+    console.log(`Run ${run.id} · ${timeStr} · ${chalk.red("aborted")}`);
   } else {
     console.log(`Run ${run.id} · ${timeStr} · ${run.status}`);
   }
