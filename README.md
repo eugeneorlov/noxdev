@@ -20,6 +20,10 @@ An open-source Node.js CLI that orchestrates autonomous coding agents overnight.
 
 ## Quick Start
 
+<div align="center">
+  <img src="packages/cli/assets/demo/fullstack-demo-hero.png" alt="Noxdev fullstack demo - autonomous coding agent in action" width="800">
+</div>
+
 ```bash
 npm install -g noxdev
 noxdev doctor                           # check prerequisites
