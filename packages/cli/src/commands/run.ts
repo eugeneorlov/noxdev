@@ -6,7 +6,7 @@ import { spawn, execSync } from "node:child_process";
 import chalk from "chalk";
 import type Database from "better-sqlite3";
 import { getDb } from "../db/index.js";
-import { getAllProjects, getProject } from "../db/queries.js";
+import { getAllProjects, getProject, abortOrphanedRuns } from "../db/queries.js";
 import { loadProjectConfig } from "../config/index.js";
 import { loadGlobalConfig } from "../config/index.js";
 import { resolveAuth } from "../auth/index.js";
@@ -341,7 +341,12 @@ export function registerRun(program: Command): void {
             return;
           }
 
+          // Clean up orphaned 'running' runs from previous crashes/kills
           const db = getDb();
+          const abortedCount = abortOrphanedRuns(db);
+          if (abortedCount > 0) {
+            console.log(chalk.gray(`  ✓ Cleaned up ${abortedCount} orphaned run(s)`));
+          }
 
           if (opts.all) {
             await runAllProjects(db);

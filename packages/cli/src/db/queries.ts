@@ -189,3 +189,12 @@ export function getAllProjects(db: Database.Database) {
     )
     .all();
 }
+
+export function abortOrphanedRuns(db: Database.Database): number {
+  const result = db.prepare(
+    `UPDATE runs
+     SET status = 'aborted', finished_at = datetime('now')
+     WHERE status = 'running'`
+  ).run();
+  return result.changes;
+}
