@@ -11,6 +11,12 @@
     "turbo": "^2.4.0"
   },
   "pnpm": {
-    "onlyBuiltDependencies": ["better-sqlite3", "esbuild"]
+    "onlyBuiltDependencies": [
+      "better-sqlite3",
+      "esbuild"
+    ]
+  },
+  "dependencies": {
+    "@eugene218/noxdev": "^1.0.2"
   }
 }

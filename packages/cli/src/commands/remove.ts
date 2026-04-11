@@ -94,6 +94,15 @@ async function runRemove(projectId: string, force: boolean): Promise<void> {
 
   if (!existsSync(worktreePath)) {
     console.log(chalk.green(`  ✓ Worktree removed: ${worktreePath}`));
+    // Delete the worktree branch
+    try {
+      execSync(`git -C "${project.repo_path}" branch -D noxdev/${projectId}`, {
+        stdio: ['pipe', 'pipe', 'pipe'],
+      });
+      console.log(chalk.green(`  ✓ Branch noxdev/${projectId} deleted`));
+    } catch {
+      // Branch may not exist or repo may be gone
+    }
   }
 
   // 4. Delete from SQLite in order (foreign keys)

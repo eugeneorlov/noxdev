@@ -7,6 +7,10 @@ settings:
 importers:
 
   .:
+    dependencies:
+      '@eugene218/noxdev':
+        specifier: ^1.0.2
+        version: 1.0.2
     devDependencies:
       turbo:
         specifier: ^2.4.0
@@ -528,6 +532,11 @@ packages:
     engines: {node: '>=18'}
     cpu: [x64]
     os: [win32]
+
+  '@eugene218/noxdev@1.0.2':
+    resolution: {integrity: sha512-RWoYPLc1rQgPS5G6K8iipBaEsB75Or7R0m1rrPU9yTzjQRlEeRJMKQTGdVNXuqWIQGXJ7b0F0s9TVO0pvF0snQ==}
+    engines: {node: '>=20.0.0 <23.0.0'}
+    hasBin: true
 
   '@jridgewell/gen-mapping@0.3.13':
     resolution: {integrity: sha512-2kkt/7niJ6MgEPxF0bYdQ6etZaA+fQvDcLKckhy1yIQOzaoKjBBjSj63/aLVjYE3qhRt5dvM+uUyfCg6UKCBbA==}
@@ -2294,6 +2303,17 @@ snapshots:
 
   '@esbuild/win32-x64@0.27.4':
     optional: true
+
+  '@eugene218/noxdev@1.0.2':
+    dependencies:
+      better-sqlite3: 11.10.0
+      chalk: 5.6.2
+      commander: 13.1.0
+      cors: 2.8.6
+      express: 4.22.1
+      ora: 8.2.0
+    transitivePeerDependencies:
+      - supports-color
 
   '@jridgewell/gen-mapping@0.3.13':
     dependencies:

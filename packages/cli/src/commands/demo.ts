@@ -36,10 +36,9 @@ export function registerDemo(program: Command): void {
   program
     .command("demo")
     .description("Scaffold a fresh Vite + React + TypeScript project and run noxdev demo tasks")
-    .option("--fresh", "Clean up any existing noxdev-demo project first")
-    .action(async (opts: { fresh?: boolean }) => {
+    .action(async () => {
       try {
-        await runDemo(opts);
+        await runDemo();
       } catch (err: unknown) {
         console.error(
           chalk.red(
@@ -51,7 +50,7 @@ export function registerDemo(program: Command): void {
     });
 }
 
-async function runDemo(opts: { fresh?: boolean } = {}): Promise<void> {
+async function runDemo(): Promise<void> {
   console.log(chalk.bold('\n🦉 noxdev demo\n'));
 
   const projectName = "noxdev-demo";
@@ -59,34 +58,29 @@ async function runDemo(opts: { fresh?: boolean } = {}): Promise<void> {
   const worktreePath = join(homedir(), "worktrees", projectName);
   const branch = `noxdev/${projectName}`;
 
-  // Clean up existing project if --fresh option is used
-  if (opts.fresh) {
-    console.log(chalk.yellow('🧹 Cleaning up existing demo project...'));
+  // Always clean up previous demo state
+  const db = getDb();
+  const existing = db
+    .prepare("SELECT id FROM projects WHERE id = ?")
+    .get(projectName) as { id: string } | undefined;
 
-    // Remove from database
-    const db = getDb();
-    const existing = db
-      .prepare("SELECT id FROM projects WHERE id = ?")
-      .get(projectName) as { id: string } | undefined;
-
+  if (existing || existsSync(worktreePath) || existsSync(tempDir)) {
+    console.log(chalk.yellow('🧹 Cleaning up previous demo...'));
     if (existing) {
+      db.prepare("DELETE FROM task_results WHERE run_id IN (SELECT id FROM runs WHERE project_id = ?)").run(projectName);
+      db.prepare("DELETE FROM tasks WHERE run_id IN (SELECT id FROM runs WHERE project_id = ?)").run(projectName);
+      db.prepare("DELETE FROM runs WHERE project_id = ?").run(projectName);
       db.prepare("DELETE FROM projects WHERE id = ?").run(projectName);
-      console.log(chalk.gray('  ✓ Removed project from database'));
     }
-
-    // Remove worktree directory
     if (existsSync(worktreePath)) {
       rmSync(worktreePath, { recursive: true, force: true });
-      console.log(chalk.gray('  ✓ Removed worktree directory'));
     }
-
-    // Remove temp directory
     if (existsSync(tempDir)) {
       rmSync(tempDir, { recursive: true, force: true });
-      console.log(chalk.gray('  ✓ Removed temporary directory'));
+      try {
+        execSync(`git -C ${tempDir} branch -D noxdev/${projectName}`, { stdio: ['pipe', 'pipe', 'pipe'] });
+      } catch { /* branch or repo may not exist */ }
     }
-
-    console.log(chalk.green('✓ Cleanup complete\n'));
   }
 
   console.log(chalk.cyan('This demo will:'));
@@ -116,19 +110,6 @@ async function runDemo(opts: { fresh?: boolean } = {}): Promise<void> {
     process.exit(1);
   }
   console.log(chalk.green('✓ Docker image noxdev-runner:latest found'));
-
-  // Check for existing demo project
-  const db = getDb();
-  const existing = db
-    .prepare("SELECT id FROM projects WHERE id = ?")
-    .get(projectName) as { id: string } | undefined;
-
-  if (existing) {
-    console.log(chalk.yellow(`⚠ Project "${projectName}" already exists.`));
-    console.log(chalk.gray('  Use --fresh to clean up and start over.'));
-    console.log(chalk.gray(`  Or run: noxdev run ${projectName}`));
-    return;
-  }
 
   // Step 2: Scaffold Vite project
   console.log(chalk.bold('\nStep 2: Scaffolding Vite + React + TypeScript project'));

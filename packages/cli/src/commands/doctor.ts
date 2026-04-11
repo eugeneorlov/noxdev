@@ -42,15 +42,20 @@ export function registerDoctor(program: Command): void {
 
       const checks: CheckResult[] = [];
 
-      // 1. Node.js version >= 18
-      checks.push(runCheck("Node.js version >= 18", true, () => {
+      // 1. Node.js version (tiered check matching setup.ts)
+      checks.push(runCheck("Node.js version (20-24 supported)", true, () => {
         const version = process.version;
-        const major = parseInt(version.slice(1).split('.')[0]);
-        if (major >= 18) {
-          return { passed: true };
-        } else {
-          return { passed: false, message: `Node.js 18+ required, found ${version}` };
+        const major = parseInt(version.slice(1).split('.')[0], 10);
+        if (major < 20) {
+          return { passed: false, message: `Node 20+ required, found ${version}` };
         }
+        if (major >= 25) {
+          return { passed: false, message: `Node ${version} not supported (better-sqlite3 has no prebuilts for 25+). Install Node 22 LTS.` };
+        }
+        if (major > 22) {
+          return { passed: true, message: `${version} (untested, supported: 20.x, 22.x LTS)` };
+        }
+        return { passed: true, message: version };
       }));
 
       // 2. Docker installed
