@@ -12,39 +12,25 @@ import chalk from "chalk";
 import ora from "ora";
 import { getDb } from "../db/index.js";
 import type { ProjectConfig } from "../config/types.js";
-import { getProjectType, getCommand, type ProjectType } from "../lib/projectType.js";
+import { getProjectType, type ProjectType } from "../lib/projectType.js";
+import { generateCommands, type ProjectFramework } from "../lib/configDefaults.js";
 
 interface DetectedCommands {
   test_command: string;
   build_command: string;
   lint_command: string;
+  framework: ProjectFramework;
 }
 
 function detectCommands(repoPath: string, projectType: ProjectType): DetectedCommands {
+  const { framework, commands } = generateCommands(repoPath, projectType.packageManager);
 
-  const defaults: DetectedCommands = {
-    test_command: getCommand(projectType, "test"),
-    build_command: getCommand(projectType, "build"),
-    lint_command: getCommand(projectType, "lint"),
+  return {
+    test_command: commands.test_command,
+    build_command: commands.build_command,
+    lint_command: commands.lint_command,
+    framework,
   };
-
-  const pkgPath = join(repoPath, "package.json");
-  if (!existsSync(pkgPath)) return defaults;
-
-  try {
-    const pkg = JSON.parse(readFileSync(pkgPath, "utf-8")) as {
-      scripts?: Record<string, string>;
-    };
-    const scripts = pkg.scripts ?? {};
-
-    return {
-      test_command: scripts.test ? getCommand(projectType, "test") : defaults.test_command,
-      build_command: scripts.build ? getCommand(projectType, "build") : defaults.build_command,
-      lint_command: scripts.lint ? getCommand(projectType, "lint") : defaults.lint_command,
-    };
-  } catch {
-    return defaults;
-  }
 }
 
 export function registerInit(program: Command): void {
@@ -281,6 +267,7 @@ async function runInit(project: string, repoPath: string, overrideType?: string)
   console.log(chalk.bold("Project initialized:"));
   console.log(`  Worktree:  ${chalk.cyan(worktreePath)}`);
   console.log(`  Branch:    ${chalk.cyan(branch)}`);
+  console.log(`  Framework: ${chalk.cyan(detected.framework.defaults.name)}`);
   console.log(`  Package:   ${chalk.cyan(projectType.packageManager)}`);
   console.log(`  Test:      ${detected.test_command}`);
   console.log(`  Build:     ${detected.build_command}`);
