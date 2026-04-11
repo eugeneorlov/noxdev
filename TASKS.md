@@ -249,7 +249,7 @@
   command exits immediately after printing the URLs.
 
 ## T5: Fullstack demo TASKS.md template (3 tasks, 5-min budget)
-- STATUS: pending
+- STATUS: done
 - FILES: packages/cli/templates/demo-tasks.md
 - VERIFY: ls packages/cli/templates/demo-tasks.md && grep -c "^## T" packages/cli/templates/demo-tasks.md
 - CRITIC: skip
@@ -352,7 +352,7 @@
   ```
 
 ## T6: Add Python informational checks to noxdev doctor
-- STATUS: pending
+- STATUS: done
 - FILES: packages/cli/src/commands/doctor.ts
 - VERIFY: cd packages/cli && pnpm build && node dist/index.js doctor
 - CRITIC: skip
@@ -390,7 +390,7 @@
   that excludes the check from the failed-count totals.
 
 ## T7: README "Works with" section + fullstack demo screenshot
-- STATUS: pending
+- STATUS: done
 - FILES: README.md
 - VERIFY: grep -q "Python" README.md && grep -q "FastAPI" README.md
 - CRITIC: skip
@@ -418,7 +418,7 @@
   Do not modify any other section.
 
 ## T8: Version bump to 1.0.4 and CHANGELOG entry
-- STATUS: pending
+- STATUS: done
 - FILES: packages/cli/package.json, packages/cli/CHANGELOG.md
 - VERIFY: cd packages/cli && pnpm build && node dist/index.js --version | grep "1.0.4"
 - CRITIC: skip
