@@ -16,21 +16,9 @@ import ora from "ora";
 import { getDb } from "../db/index.js";
 import type { ProjectConfig } from "../config/types.js";
 import { demoTasksPath } from '../lib/paths.js';
+import { dumpErr } from '../lib/errors.js';
 
 
-function dumpErr(err: unknown): void {
-     if (err && typeof err === 'object') {
-       const e = err as { stderr?: Buffer; stdout?: Buffer };
-       if (e.stderr?.length) {
-         console.error(chalk.gray('  ─ stderr ─'));
-         console.error(chalk.gray('  ' + e.stderr.toString().trim().replace(/\n/g, '\n  ')));
-       }
-       if (e.stdout?.length) {
-         console.error(chalk.gray('  ─ stdout ─'));
-         console.error(chalk.gray('  ' + e.stdout.toString().trim().replace(/\n/g, '\n  ')));
-       }
-     }
-   }
 
 export function registerDemo(program: Command): void {
   program
@@ -79,7 +67,10 @@ async function runDemo(): Promise<void> {
       rmSync(tempDir, { recursive: true, force: true });
       try {
         execSync(`git -C ${tempDir} branch -D noxdev/${projectName}`, { stdio: ['pipe', 'pipe', 'pipe'] });
-      } catch { /* branch or repo may not exist */ }
+      } catch (err: unknown) {
+        // branch or repo may not exist, but dump error for debugging
+        dumpErr(err);
+      }
     }
   }
 
@@ -100,8 +91,9 @@ async function runDemo(): Promise<void> {
       stdio: ["pipe", "pipe", "pipe"],
     }).trim();
     dockerOk = result.length > 0;
-  } catch {
+  } catch (err: unknown) {
     // docker not available or errored
+    dumpErr(err);
   }
 
   if (!dockerOk) {
@@ -340,8 +332,9 @@ async function runSingleProject(project: {
     execSync('git add TASKS.md', { cwd: project.worktree_path, stdio: ['pipe', 'pipe', 'pipe'] });
     execSync('git commit -m "noxdev: update task statuses"', { cwd: project.worktree_path, stdio: ['pipe', 'pipe', 'pipe'] });
     console.log(chalk.gray('  ✓ TASKS.md status updates committed'));
-  } catch {
-    // Silently ignore — TASKS.md might not have changes
+  } catch (err: unknown) {
+    // TASKS.md might not have changes, but dump error for debugging
+    dumpErr(err);
   }
 }
 
