@@ -37,6 +37,7 @@
     "prebuild": "mkdir -p docker && cp ../../docker/Dockerfile docker/Dockerfile",
     "build": "tsup",
     "postbuild": "rm -rf dist/scripts && cp -r scripts dist/scripts && rm -rf dist/dashboard && cp -r ../dashboard/dist dist/dashboard",
+    "postinstall": "node scripts/check-native.js",
     "lint": "tsc --noEmit",
     "test": "vitest run"
   },
