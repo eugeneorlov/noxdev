@@ -33,6 +33,7 @@ export function registerDemo(program: Command): void {
             `Error: ${err instanceof Error ? err.message : String(err)}`,
           ),
         );
+        dumpErr(err);
         process.exitCode = 1;
       }
     });
