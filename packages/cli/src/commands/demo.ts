@@ -109,7 +109,7 @@ async function runDemo(): Promise<void> {
   const spinner = ora('Creating Vite project...').start();
   try {
     // Create project with Vite
-    execSync(`npm create vite@latest ${projectName} -- --template react-ts`, {
+    execSync(`pnpm dlx create-vite@latest ${projectName} --template react-ts`, {
       cwd: tmpdir(),
       stdio: ['pipe', 'pipe', 'pipe']
     });
