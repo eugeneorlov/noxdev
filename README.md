@@ -31,6 +31,16 @@ noxdev merge my-project                 # approve/reject commits
 noxdev dashboard                        # visual review UI
 ```
 
+## Works with
+
+noxdev is **language-agnostic** and works with any tech stack that can be containerized. The autonomous agents adapt to your codebase's language, framework, and tooling.
+
+**Proven paths:**
+- **TypeScript/JavaScript**: React, Next.js, Vue, Express, Node.js APIs
+- **Python**: FastAPI, Django, Flask, data science projects, ML workflows
+
+The agents understand your project's build systems, package managers, and testing frameworks. Whether you're building frontends, backends, APIs, or data pipelines, noxdev adapts to your development workflow.
+
 ## Task Format
 
 Tasks are defined in `TASKS.md` using this format:
