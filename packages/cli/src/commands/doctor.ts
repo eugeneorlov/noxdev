@@ -10,18 +10,20 @@ interface CheckResult {
   name: string;
   passed: boolean;
   critical: boolean;
+  category: 'prerequisites' | 'managed';
   message?: string;
 }
 
-function runCheck(name: string, critical: boolean, checkFn: () => { passed: boolean; message?: string }): CheckResult {
+function runCheck(name: string, critical: boolean, category: 'prerequisites' | 'managed', checkFn: () => { passed: boolean; message?: string }): CheckResult {
   try {
     const result = checkFn();
-    return { name, passed: result.passed, critical, message: result.message };
+    return { name, passed: result.passed, critical, category, message: result.message };
   } catch (error) {
     return {
       name,
       passed: false,
       critical,
+      category,
       message: error instanceof Error ? error.message : String(error)
     };
   }
@@ -43,7 +45,7 @@ export function registerDoctor(program: Command): void {
       const checks: CheckResult[] = [];
 
       // 1. Node.js version (tiered check matching setup.ts)
-      checks.push(runCheck("Node.js version (20-24 supported)", true, () => {
+      checks.push(runCheck("Node.js version (20-24 supported)", true, 'prerequisites', () => {
         const version = process.version;
         const major = parseInt(version.slice(1).split('.')[0], 10);
         if (major < 20) {
@@ -59,7 +61,7 @@ export function registerDoctor(program: Command): void {
       }));
 
       // 2. Docker installed
-      checks.push(runCheck("Docker installed", true, () => {
+      checks.push(runCheck("Docker installed", true, 'prerequisites', () => {
         try {
           const output = execSync("docker --version", { encoding: "utf8" }).trim();
           return { passed: true, message: output };
@@ -69,7 +71,7 @@ export function registerDoctor(program: Command): void {
       }));
 
       // 3. Docker daemon running
-      checks.push(runCheck("Docker daemon running", true, () => {
+      checks.push(runCheck("Docker daemon running", true, 'prerequisites', () => {
         try {
           execSync("docker info", { stdio: "pipe" });
           return { passed: true };
@@ -79,7 +81,7 @@ export function registerDoctor(program: Command): void {
       }));
 
       // 4. Docker image exists
-      checks.push(runCheck("Docker image exists", false, () => {
+      checks.push(runCheck("Docker image exists", false, 'managed', () => {
         try {
           const output = execSync("docker images -q noxdev-runner:latest", { encoding: "utf8" }).trim();
           if (output) {
@@ -93,7 +95,7 @@ export function registerDoctor(program: Command): void {
       }));
 
       // 5. noxdev config directory
-      checks.push(runCheck("noxdev config directory", false, () => {
+      checks.push(runCheck("noxdev config directory", false, 'managed', () => {
         const configDir = join(homedir(), ".noxdev");
         if (existsSync(configDir)) {
           return { passed: true };
@@ -103,7 +105,7 @@ export function registerDoctor(program: Command): void {
       }));
 
       // 6. SQLite database
-      checks.push(runCheck("SQLite database", false, () => {
+      checks.push(runCheck("SQLite database", false, 'managed', () => {
         const dbPath = join(homedir(), ".noxdev", "ledger.db");
         if (!existsSync(dbPath)) {
           return { passed: false, message: "No database. Run: noxdev setup" };
@@ -120,7 +122,7 @@ export function registerDoctor(program: Command): void {
       }));
 
       // 7. Git installed
-      checks.push(runCheck("Git installed", true, () => {
+      checks.push(runCheck("Git installed", true, 'prerequisites', () => {
         try {
           execSync("git --version", { stdio: "pipe" });
           return { passed: true };
@@ -130,7 +132,7 @@ export function registerDoctor(program: Command): void {
       }));
 
       // 8. SOPS installed
-      checks.push(runCheck("SOPS installed", false, () => {
+      checks.push(runCheck("SOPS installed", false, 'prerequisites', () => {
         try {
           execSync("sops --version", { stdio: "pipe" });
           return { passed: true };
@@ -140,7 +142,7 @@ export function registerDoctor(program: Command): void {
       }));
 
       // 9. Python3 version (informational)
-      checks.push(runCheck("Python3 version", false, () => {
+      checks.push(runCheck("Python3 version", false, 'prerequisites', () => {
         try {
           const output = execSync("python3 --version", { encoding: "utf8" }).trim();
           return { passed: true, message: output };
@@ -150,7 +152,7 @@ export function registerDoctor(program: Command): void {
       }));
 
       // 10. uv version (informational)
-      checks.push(runCheck("uv version", false, () => {
+      checks.push(runCheck("uv version", false, 'prerequisites', () => {
         try {
           const output = execSync("uv --version", { encoding: "utf8" }).trim();
           return { passed: true, message: output };
@@ -160,7 +162,7 @@ export function registerDoctor(program: Command): void {
       }));
 
       // 11. Claude credentials
-      checks.push(runCheck("Claude credentials", true, () => {
+      checks.push(runCheck("Claude credentials", true, 'prerequisites', () => {
         const claudePath = join(homedir(), ".claude.json");
         if (existsSync(claudePath)) {
           return { passed: true };
@@ -169,8 +171,19 @@ export function registerDoctor(program: Command): void {
         }
       }));
 
-      // Print results
-      for (const check of checks) {
+      // Print results grouped by category
+      const prerequisiteChecks = checks.filter(c => c.category === 'prerequisites');
+      const managedChecks = checks.filter(c => c.category === 'managed');
+
+      console.log(chalk.bold("Prerequisites"));
+      console.log("These must be installed by you:");
+      for (const check of prerequisiteChecks) {
+        console.log(formatCheckResult(check));
+      }
+
+      console.log(chalk.bold("\nManaged by noxdev"));
+      console.log("These are created and managed by noxdev:");
+      for (const check of managedChecks) {
         console.log(formatCheckResult(check));
       }
 
