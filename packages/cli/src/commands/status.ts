@@ -95,9 +95,10 @@ export function showProjectStatus(db: Database.Database, projectId: string): voi
     console.log(`Run ${run.id} · ${timeStr} · ${run.status}`);
   }
 
-  const completed = run.completed ?? 0;
-  const failed = run.failed ?? 0;
-  const skipped = run.skipped ?? 0;
+  // Derive counts from task_results, not runs table (handles aborted runs correctly)
+  const completed = tasks.filter(t => t.status === "completed" || t.status === "completed_retry").length;
+  const failed = tasks.filter(t => t.status === "failed").length;
+  const skipped = tasks.filter(t => t.status === "skipped").length;
   const total = run.total_tasks ?? 0;
 
   console.log("");
