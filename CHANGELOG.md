@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.3] - 2026-04-11
+
+### Added
+- `dumpErr` helper utility for enhanced error diagnostics — all `demo.ts` catch blocks
+  now surface stderr/stdout from failed child processes instead of swallowing errors.
+- Postinstall script to detect missing better-sqlite3 native builds and provide
+  helpful troubleshooting guidance.
+
+### Fixed
+- Vite scaffold reliability in `noxdev demo` — pinned to `pnpm dlx` form for
+  non-interactive execution compatibility.
+
 ## [1.0.2] - 2026-04-09
 
 ### Fixed
