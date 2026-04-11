@@ -12,6 +12,7 @@ import chalk from "chalk";
 import ora from "ora";
 import { getDb } from "../db/index.js";
 import type { ProjectConfig } from "../config/types.js";
+import { getProjectType, getCommand, type ProjectType } from "../lib/projectType.js";
 
 interface DetectedCommands {
   test_command: string;
@@ -19,11 +20,12 @@ interface DetectedCommands {
   lint_command: string;
 }
 
-function detectCommands(repoPath: string): DetectedCommands {
+function detectCommands(repoPath: string, projectType: ProjectType): DetectedCommands {
+
   const defaults: DetectedCommands = {
-    test_command: "pnpm test",
-    build_command: "pnpm build",
-    lint_command: "pnpm lint",
+    test_command: getCommand(projectType, "test"),
+    build_command: getCommand(projectType, "build"),
+    lint_command: getCommand(projectType, "lint"),
   };
 
   const pkgPath = join(repoPath, "package.json");
@@ -36,9 +38,9 @@ function detectCommands(repoPath: string): DetectedCommands {
     const scripts = pkg.scripts ?? {};
 
     return {
-      test_command: scripts.test ? `pnpm test` : defaults.test_command,
-      build_command: scripts.build ? `pnpm build` : defaults.build_command,
-      lint_command: scripts.lint ? `pnpm lint` : defaults.lint_command,
+      test_command: scripts.test ? getCommand(projectType, "test") : defaults.test_command,
+      build_command: scripts.build ? getCommand(projectType, "build") : defaults.build_command,
+      lint_command: scripts.lint ? getCommand(projectType, "lint") : defaults.lint_command,
     };
   } catch {
     return defaults;
@@ -51,9 +53,13 @@ export function registerInit(program: Command): void {
     .description("Initialize a new project")
     .argument("<project>", "project name")
     .requiredOption("--repo <path>", "path to git repository")
-    .action(async (project: string, opts: { repo: string }) => {
+    .option(
+      "--type <type>",
+      "package manager type (npm, yarn, pnpm, bun). Auto-detected if not specified",
+    )
+    .action(async (project: string, opts: { repo: string; type?: string }) => {
       try {
-        await runInit(project, opts.repo);
+        await runInit(project, opts.repo, opts.type);
       } catch (err: unknown) {
         console.error(
           chalk.red(
@@ -65,7 +71,7 @@ export function registerInit(program: Command): void {
     });
 }
 
-async function runInit(project: string, repoPath: string): Promise<void> {
+async function runInit(project: string, repoPath: string, overrideType?: string): Promise<void> {
   const resolvedRepo = resolve(repoPath);
   const branch = `noxdev/${project}`;
   const worktreePath = join(homedir(), "worktrees", project);
@@ -179,7 +185,8 @@ async function runInit(project: string, repoPath: string): Promise<void> {
   }
 
   // 3. Create .noxdev/config.json with auto-detected commands
-  const detected = detectCommands(resolvedRepo);
+  const projectType = getProjectType(resolvedRepo, overrideType);
+  const detected = detectCommands(resolvedRepo, projectType);
   const configDir = join(resolvedRepo, ".noxdev");
   const configPath = join(configDir, "config.json");
 
@@ -274,6 +281,7 @@ async function runInit(project: string, repoPath: string): Promise<void> {
   console.log(chalk.bold("Project initialized:"));
   console.log(`  Worktree:  ${chalk.cyan(worktreePath)}`);
   console.log(`  Branch:    ${chalk.cyan(branch)}`);
+  console.log(`  Package:   ${chalk.cyan(projectType.packageManager)}`);
   console.log(`  Test:      ${detected.test_command}`);
   console.log(`  Build:     ${detected.build_command}`);
   console.log(`  Lint:      ${detected.lint_command}`);
