@@ -40,6 +40,11 @@ export default function Overview() {
     );
   };
 
+  const hasZeroRuns = () => {
+    if (!projects || projects.length === 0) return true;
+    return projects.every(project => !project.last_run_id && (!project.total_tasks || project.total_tasks === 0));
+  };
+
   if (loading) {
     return (
       <div className="p-6 flex items-center justify-center">
@@ -81,11 +86,11 @@ export default function Overview() {
         )}
       </header>
 
-      {!projects || projects.length === 0 ? (
+      {hasZeroRuns() ? (
         <div className="text-center py-12">
-          <p className="text-gray-500 dark:text-gray-400 text-lg mb-2">No projects registered</p>
+          <p className="text-gray-500 dark:text-gray-400 text-lg mb-2">No runs found</p>
           <p className="text-gray-400 dark:text-gray-500 text-sm">
-            Run: <code className="bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 px-2 py-1 rounded">noxdev init &lt;project&gt;</code>
+            Get started by running: <code className="bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 px-2 py-1 rounded">noxdev demo</code>
           </p>
         </div>
       ) : (
