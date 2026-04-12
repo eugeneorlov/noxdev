@@ -65,13 +65,12 @@ async function runDemo(): Promise<void> {
       rmSync(worktreePath, { recursive: true, force: true });
     }
     if (existsSync(tempDir)) {
-      rmSync(tempDir, { recursive: true, force: true });
       try {
         execSync(`git -C ${tempDir} branch -D noxdev/${projectName}`, { stdio: ['pipe', 'pipe', 'pipe'] });
-      } catch (err: unknown) {
-        // branch or repo may not exist, but dump error for debugging
-        dumpErr(err);
+      } catch {
+        // Branch may not exist — fine, nothing to clean up
       }
+      rmSync(tempDir, { recursive: true, force: true });
     }
   }
 
@@ -147,12 +146,17 @@ def health_check():
 `;
     writeFileSync(join(backendPath, 'main.py'), fastApiContent);
 
-    // Create basic requirements.txt
-    const requirementsContent = `fastapi>=0.104.0
-uvicorn[standard]>=0.24.0
-`;
-    writeFileSync(join(backendPath, 'requirements.txt'), requirementsContent);
-
+    // Create pyproject.toml for uv-managed backend
+    const pyprojectContent = `[project]
+      name = "backend"
+      version = "0.1.0"
+      requires-python = ">=3.12"
+      dependencies = [
+          "fastapi>=0.104.0",
+          "uvicorn[standard]>=0.24.0",
+      ]
+      `;
+    writeFileSync(join(backendPath, 'pyproject.toml'), pyprojectContent);
     // Create root package.json for workspace
     const rootPackageJson = {
       name: projectName,
@@ -160,12 +164,13 @@ uvicorn[standard]>=0.24.0
       workspaces: ["frontend", "backend"],
       scripts: {
         "dev:frontend": "cd frontend && pnpm dev",
-        "dev:backend": "cd backend && uvicorn main:app --reload --port 8000",
+        "dev:backend": "cd backend && uv run uvicorn main:app --reload --port 8000",
         "build:frontend": "cd frontend && pnpm build",
         "test": "cd frontend && pnpm build"
       },
       devDependencies: {}
     };
+
     writeFileSync(join(tempDir, 'package.json'), JSON.stringify(rootPackageJson, null, 2));
 
     spinner.succeed('Fullstack project scaffolded');
@@ -287,6 +292,17 @@ uvicorn[standard]>=0.24.0
     throw err;
   }
 
+  // Step 6.1: Sync Python backend deps
+  const uvSpinner = ora('Syncing backend dependencies with uv...').start();
+  try {
+    execSync('uv sync', { cwd: join(worktreePath, 'backend'), stdio: ['pipe', 'pipe', 'pipe'] });
+    uvSpinner.succeed('Backend dependencies synced');
+  } catch (err: unknown) {
+    uvSpinner.fail('Failed to sync backend dependencies');
+    dumpErr(err);
+    throw err;
+  }
+
   // Step 7: Run noxdev on the project
   console.log(chalk.bold('\nStep 7: Running noxdev demo tasks autonomously'));
   console.log(chalk.cyan('🦉 Launching autonomous agent...\n'));
@@ -328,8 +344,8 @@ uvicorn[standard]>=0.24.0
   console.log(chalk.gray('  • All changes were committed automatically'));
   console.log('');
   console.log(chalk.bold('Next steps:'));
-  console.log(chalk.gray(`  • Start frontend: cd ${worktreePath} && pnpm dev:frontend`));
-  console.log(chalk.gray(`  • Start backend: cd ${worktreePath} && pnpm dev:backend`));
+  console.log(chalk.gray(`  • Start frontend:       cd ${worktreePath}/frontend && pnpm dev`));
+  console.log(chalk.gray(`  • Start backend:        cd ${worktreePath}/backend && uv run uvicorn main:app --reload --port 8000`));
   console.log(chalk.gray(`  • See the tasks: cat ${worktreePath}/TASKS.md`));
   console.log(chalk.gray(`  • Run more tasks: noxdev run ${projectName}`));
   console.log(chalk.gray('  • Review changes: noxdev dashboard'));

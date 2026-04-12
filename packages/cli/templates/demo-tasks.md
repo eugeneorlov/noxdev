@@ -9,8 +9,8 @@
 
 ## T1: Create FastAPI backend with todos endpoint
 - STATUS: pending
-- FILES: backend/main.py, backend/requirements.txt, backend/test_main.py
-- VERIFY: cd backend && python -c "import main" && grep -q "todos" main.py
+- FILES: backend/main.py, backend/pyproject.toml, backend/test_main.py
+- VERIFY: cd backend && uv sync && uv run python -c "import main" && grep -q "todos" main.py
 - CRITIC: skip
 - PUSH: auto
 - SPEC: Create a FastAPI backend that serves a todos API.
@@ -27,11 +27,16 @@
   - Add proper type hints using Pydantic BaseModel for request/response
   - Include proper error handling for 404s
 
-  REQUIREMENTS for backend/requirements.txt:
-  - fastapi>=0.104.0
-  - uvicorn[standard]>=0.24.0
-  - pytest>=7.4.0
-  - httpx>=0.25.0  # for testing
+  REQUIREMENTS for backend/pyproject.toml:
+  - Use uv's pyproject.toml format
+  - [project] section with name="backend", version="0.1.0", requires-python=">=3.12"
+  - dependencies list:
+    - "fastapi>=0.104.0"
+    - "uvicorn[standard]>=0.24.0"
+    - "httpx>=0.25.0"
+  - [dependency-groups] section with dev = ["pytest>=7.4.0"]
+  - A pyproject.toml may already exist from the demo scaffold with fastapi and uvicorn deps — extend it, do not overwrite blindly
+  - Run `uv sync` after editing to regenerate the lockfile
 
   REQUIREMENTS for backend/test_main.py:
   - Import pytest, httpx, and main.py app
@@ -84,10 +89,10 @@
   - Create workspace with "workspaces": ["frontend", "backend"]
   - Add scripts:
     - "dev:frontend": "cd frontend && pnpm dev"
-    - "dev:backend": "cd backend && uvicorn main:app --reload --port 8000"
+    - "dev:backend": "cd backend && uv run uvicorn main:app --reload --port 8000"
     - "dev": "concurrently \"pnpm dev:backend\" \"pnpm dev:frontend\""
     - "build:frontend": "cd frontend && pnpm build"
-    - "test:backend": "cd backend && python -m pytest"
+    - "test:backend": "cd backend && uv run pytest"
     - "test": "pnpm test:backend && pnpm build:frontend"
   - Add concurrently to devDependencies
 
