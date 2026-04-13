@@ -49,12 +49,18 @@ CREATE TABLE IF NOT EXISTS task_results (
   dev_log_file TEXT,
   critic_log_file TEXT,
   diff_file TEXT,
-  merge_decision TEXT DEFAULT 'pending',
-  merged_at TEXT
+  input_tokens INTEGER,
+  output_tokens INTEGER,
+  cache_read_tokens INTEGER,
+  cache_write_tokens INTEGER,
+  model TEXT,
+  auth_mode_cost TEXT,
+  cost_usd REAL
 );
 
 CREATE INDEX IF NOT EXISTS idx_task_results_run ON task_results(run_id);
 CREATE INDEX IF NOT EXISTS idx_task_results_status ON task_results(status);
+CREATE INDEX IF NOT EXISTS idx_task_results_started ON task_results(started_at);
 
 CREATE TABLE IF NOT EXISTS tasks (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
