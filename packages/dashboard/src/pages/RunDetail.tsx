@@ -21,8 +21,6 @@ interface TaskResult {
   dev_log_file: string | null;
   critic_log_file: string | null;
   diff_file: string | null;
-  merge_decision: string;
-  merged_at: string | null;
 }
 
 interface RunDetail {

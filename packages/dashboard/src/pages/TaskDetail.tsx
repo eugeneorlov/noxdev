@@ -22,8 +22,6 @@ interface TaskDetailData {
   dev_log_file: string | null;
   critic_log_file: string | null;
   diff_file: string | null;
-  merge_decision: string;
-  merged_at: string | null;
   task_spec?: string;
   files?: string;
   verify?: string;
@@ -33,7 +31,6 @@ interface TaskDetailData {
 export default function TaskDetail() {
   const { runId, taskId } = useParams();
   const { data: task, loading, error } = useApi<TaskDetailData>(`/api/runs/${runId}/tasks/${taskId}`);
-  const [updating, setUpdating] = useState(false);
 
   const formatDateTime = (timestamp: string | null): string => {
     if (!timestamp) return '—';
@@ -59,20 +56,6 @@ export default function TaskDetail() {
     return sha.substring(0, 7);
   };
 
-  const getMergeDecisionBadge = (decision: string) => {
-    const styles = {
-      pending: 'bg-gray-100 text-gray-800',
-      approved: 'bg-green-100 text-green-800',
-      rejected: 'bg-red-100 text-red-800',
-      merged: 'bg-blue-100 text-blue-800',
-    };
-
-    return (
-      <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${styles[decision as keyof typeof styles] || styles.pending}`}>
-        {decision}
-      </span>
-    );
-  };
 
   const parseTaskFiles = (files: string | null): string[] => {
     if (!files) return [];
@@ -84,32 +67,6 @@ export default function TaskDetail() {
     }
   };
 
-  const handleMergeDecision = async (decision: 'approved' | 'rejected') => {
-    if (!runId || !taskId || updating) return;
-
-    setUpdating(true);
-    try {
-      const response = await fetch(`/api/runs/${runId}/tasks/${taskId}/merge`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ decision }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      // Refresh the page to get updated data
-      window.location.reload();
-    } catch (err) {
-      console.error('Failed to update merge decision:', err);
-      alert('Failed to update merge decision. Please try again.');
-    } finally {
-      setUpdating(false);
-    }
-  };
 
   if (loading) {
     return (
@@ -231,42 +188,6 @@ export default function TaskDetail() {
           <DiffViewer diff={task.diff_content || ''} />
         </section>
 
-        {/* Merge */}
-        <section>
-          <h2 className="text-xl font-semibold mb-3">Merge</h2>
-          <div className="bg-gray-50 p-4 rounded-lg">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <span className="text-sm text-gray-600">Current decision:</span>
-                {getMergeDecisionBadge(task.merge_decision)}
-              </div>
-
-              {task.merge_decision?.toLowerCase() === 'pending' && (
-                <div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => handleMergeDecision('approved')}
-                      disabled={updating}
-                      className="px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700 disabled:opacity-50"
-                    >
-                      {updating ? 'Updating...' : 'Approve'}
-                    </button>
-                    <button
-                      onClick={() => handleMergeDecision('rejected')}
-                      disabled={updating}
-                      className="px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700 disabled:opacity-50"
-                    >
-                      {updating ? 'Updating...' : 'Reject'}
-                    </button>
-                  </div>
-                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
-                    Records your decision. Run <code className="bg-gray-100 dark:bg-gray-800 px-1 rounded">noxdev merge</code> in terminal to execute.
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-        </section>
 
         {/* Logs */}
         <section>

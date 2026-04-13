@@ -22,8 +22,6 @@ interface TaskResult {
   dev_log_file: string | null;
   critic_log_file: string | null;
   diff_file: string | null;
-  merge_decision: string;
-  merged_at: string | null;
 }
 
 interface TaskRowProps {
@@ -52,31 +50,6 @@ export function TaskRow({ task, runId }: TaskRowProps) {
     return sha.substring(0, 7);
   };
 
-  const getMergeDecisionBadge = (decision: string | null | undefined, pushMode: string | null) => {
-    // Don't render badge if decision is null or undefined
-    if (!decision) return null;
-
-    // If auto-push and pending, don't show the badge
-    if (pushMode === 'auto' && decision === 'pending') {
-      return null;
-    }
-
-    const styles = {
-      pending: 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200',
-      approved: 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200',
-      rejected: 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200',
-      merged: 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200',
-    };
-
-    // For gate push mode (or when push_mode is not available), prefix with "merge: "
-    const displayText = (pushMode === 'gate' || !pushMode) ? `merge: ${decision}` : decision;
-
-    return (
-      <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${styles[decision as keyof typeof styles] || styles.pending}`}>
-        {displayText}
-      </span>
-    );
-  };
 
   const parseTaskFiles = (files: string | null): string[] => {
     if (!files) return [];
@@ -111,7 +84,6 @@ export function TaskRow({ task, runId }: TaskRowProps) {
           <span className="text-sm text-gray-600 dark:text-gray-400 font-mono">
             {truncateCommitSha(task.commit_sha)}
           </span>
-          {getMergeDecisionBadge(task.merge_decision, task.push_mode)}
         </div>
 
         <div className="flex-shrink-0">
