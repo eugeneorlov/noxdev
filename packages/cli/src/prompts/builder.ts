@@ -31,6 +31,7 @@ ${filesSection}
 ## Verification:
 After completing the task, run: ${task.verify}
 If the verification command fails, fix the issue and re-run until it passes.
+Before reporting this task as complete, execute the VERIFY command as a real shell command in the worktree. Include the exact command output and exit code in your completion summary. If the VERIFY command exits non-zero, iterate on your changes until it passes, or report the failure honestly — do not claim success based on reasoning alone.
 `;
 
   if (attempt > 1 && previousError) {
