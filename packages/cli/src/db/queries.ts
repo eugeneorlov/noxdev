@@ -98,6 +98,13 @@ export function insertTaskResult(
     devLogFile: string | null;
     criticLogFile: string | null;
     diffFile: string | null;
+    inputTokens?: number;
+    outputTokens?: number;
+    cacheReadTokens?: number;
+    cacheWriteTokens?: number;
+    model?: string | null;
+    authModeCost?: string;
+    costUsd?: number;
   },
 ): void {
   // Determine merge decision based on push mode and status
@@ -112,8 +119,10 @@ export function insertTaskResult(
     `INSERT INTO task_results
      (run_id, task_id, title, status, exit_code, auth_mode, critic_mode, push_mode,
       attempt, commit_sha, started_at, finished_at, duration_seconds,
-      dev_log_file, critic_log_file, diff_file, merge_decision, merged_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      dev_log_file, critic_log_file, diff_file, merge_decision, merged_at,
+      input_tokens, output_tokens, cache_read_tokens, cache_write_tokens,
+      model, auth_mode_cost, cost_usd)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     result.runId,
     result.taskId,
@@ -133,6 +142,13 @@ export function insertTaskResult(
     result.diffFile,
     mergeDecision,
     mergedAt,
+    result.inputTokens ?? null,
+    result.outputTokens ?? null,
+    result.cacheReadTokens ?? null,
+    result.cacheWriteTokens ?? null,
+    result.model ?? null,
+    result.authModeCost ?? null,
+    result.costUsd ?? null,
   );
 }
 

@@ -15,6 +15,8 @@ import {
   insertTaskResult,
   updateRunFinished,
 } from "../db/queries.js";
+import { findLatestSessionFile, parseSessionUsage } from "../cost/parser.js";
+import { computeCostUsd } from "../cost/pricing.js";
 
 function getCurrentSha(cwd: string): string {
   return execSync("git rev-parse HEAD", { cwd, encoding: "utf-8" }).trim();
@@ -22,6 +24,48 @@ function getCurrentSha(cwd: string): string {
 
 function isoNow(): string {
   return new Date().toISOString();
+}
+
+function captureTaskCost(
+  worktreePath: string,
+  containerStartMs: number,
+  authMode: string,
+): {
+  input_tokens: number;
+  output_tokens: number;
+  cache_read_tokens: number;
+  cache_write_tokens: number;
+  model: string | null;
+  auth_mode_cost: string;
+  cost_usd: number;
+} {
+  const jsonlPath = findLatestSessionFile(worktreePath, containerStartMs);
+
+  if (jsonlPath === null) {
+    // No session file found, return all-zero cost fields
+    return {
+      input_tokens: 0,
+      output_tokens: 0,
+      cache_read_tokens: 0,
+      cache_write_tokens: 0,
+      model: null,
+      auth_mode_cost: authMode,
+      cost_usd: 0,
+    };
+  }
+
+  const usage = parseSessionUsage(jsonlPath);
+  const costUsd = computeCostUsd(usage);
+
+  return {
+    input_tokens: usage.input_tokens,
+    output_tokens: usage.output_tokens,
+    cache_read_tokens: usage.cache_read_tokens,
+    cache_write_tokens: usage.cache_write_tokens,
+    model: usage.model,
+    auth_mode_cost: authMode,
+    cost_usd: costUsd,
+  };
 }
 
 export async function executeRun(ctx: RunContext): Promise<void> {
@@ -207,6 +251,9 @@ async function executeTask(
     copyFileSync(claudeSnapshot, claudeJsonSrc);
   }
 
+  // Capture container start time for cost tracking
+  const containerStartMs = Date.now();
+
   // Run task in Docker
   const timeoutSeconds = ctx.projectConfig.docker.timeout_minutes * 60;
   const dockerResult = runTaskInDocker(
@@ -310,6 +357,9 @@ async function executeTask(
 
   const finishedAt = isoNow();
 
+  // Capture token usage and cost from the Claude Code session JSONL
+  const costData = captureTaskCost(ctx.worktreeDir, containerStartMs, ctx.auth.mode);
+
   // Insert task result into SQLite
   insertTaskResult(ctx.db, {
     runId: ctx.runId,
@@ -328,6 +378,13 @@ async function executeTask(
     devLogFile: taskLog,
     criticLogFile,
     diffFile,
+    inputTokens: costData.input_tokens,
+    outputTokens: costData.output_tokens,
+    cacheReadTokens: costData.cache_read_tokens,
+    cacheWriteTokens: costData.cache_write_tokens,
+    model: costData.model,
+    authModeCost: costData.auth_mode_cost,
+    costUsd: costData.cost_usd,
   });
 
   // Print result
