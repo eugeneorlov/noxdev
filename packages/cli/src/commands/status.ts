@@ -40,6 +40,13 @@ interface ProjectRow {
   display_name: string;
 }
 
+interface RunCostRow {
+  api_cost: number | null;
+  max_cost: number | null;
+  input_tokens: number | null;
+  output_tokens: number | null;
+}
+
 function relativeTime(isoDate: string): string {
   const now = Date.now();
   const dateStr = isoDate.endsWith("Z") ? isoDate : isoDate + "Z";
@@ -68,6 +75,34 @@ function statusBadge(status: string): string {
     default:
       return status.toUpperCase();
   }
+}
+
+function getRunCost(db: Database.Database, runId: string): RunCostRow | null {
+  return db.prepare(`
+    SELECT
+      SUM(CASE WHEN auth_mode_cost = 'api' THEN cost_usd ELSE 0 END) as api_cost,
+      SUM(CASE WHEN auth_mode_cost = 'max' THEN cost_usd ELSE 0 END) as max_cost,
+      SUM(input_tokens) as input_tokens,
+      SUM(output_tokens) as output_tokens
+    FROM task_results
+    WHERE run_id = ? AND model IS NOT NULL
+  `).get(runId) as RunCostRow | null;
+}
+
+function formatCost(cost: number | null): string {
+  if (cost === null || cost === 0) return '$0.00';
+  return `$${cost.toFixed(2)}`;
+}
+
+function formatTokens(tokens: number | null): string {
+  if (tokens === null || tokens === 0) return '0';
+  if (tokens >= 1_000_000) {
+    return `${(tokens / 1_000_000).toFixed(1)}M`;
+  }
+  if (tokens >= 1_000) {
+    return `${(tokens / 1_000).toFixed(0)}K`;
+  }
+  return String(tokens);
 }
 
 export function showProjectStatus(db: Database.Database, projectId: string): void {
@@ -107,6 +142,16 @@ export function showProjectStatus(db: Database.Database, projectId: string): voi
   console.log(
     `Tasks: ${chalk.green(String(completed))} completed, ${chalk.red(String(failed))} failed, ${chalk.yellow(String(skipped))} skipped (of ${total})`,
   );
+
+  // Show cost information
+  const costData = getRunCost(db, run.id);
+  if (costData && (costData.api_cost || costData.max_cost || costData.input_tokens || costData.output_tokens)) {
+    const apiCostStr = formatCost(costData.api_cost);
+    const maxCostStr = formatCost(costData.max_cost);
+    const inputStr = formatTokens(costData.input_tokens);
+    const outputStr = formatTokens(costData.output_tokens);
+    console.log(`Cost: ${apiCostStr} API + ${maxCostStr} Max-equiv  ·  ${inputStr} input / ${outputStr} output tokens`);
+  }
 
   if (tasks.length > 0) {
     console.log("");

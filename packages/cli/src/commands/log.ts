@@ -23,6 +23,13 @@ interface TaskResultRow {
   diff_file: string | null;
   merge_decision: string;
   merged_at: string | null;
+  input_tokens: number | null;
+  output_tokens: number | null;
+  cache_read_tokens: number | null;
+  cache_write_tokens: number | null;
+  model: string | null;
+  auth_mode_cost: string | null;
+  cost_usd: number | null;
 }
 
 interface TaskCacheRow {
@@ -48,9 +55,31 @@ function statusBadge(status: string): string {
   }
 }
 
+function formatNumber(num: number | null): string {
+  if (num === null) return '0';
+  return new Intl.NumberFormat('en-US').format(num);
+}
+
+function formatCost(cost: number | null): string {
+  if (cost === null || cost === 0) return '$0.00';
+  return `$${cost.toFixed(4)}`;
+}
+
 export function showTaskLog(db: Database.Database, taskId: string): void {
   const results = db
-    .prepare(`SELECT * FROM task_results WHERE task_id = ? ORDER BY id DESC`)
+    .prepare(`
+      SELECT *,
+             input_tokens,
+             output_tokens,
+             cache_read_tokens,
+             cache_write_tokens,
+             model,
+             auth_mode_cost,
+             cost_usd
+      FROM task_results
+      WHERE task_id = ?
+      ORDER BY id DESC
+    `)
     .all(taskId) as TaskResultRow[];
 
   if (results.length === 0) {
@@ -97,6 +126,29 @@ export function showTaskLog(db: Database.Database, taskId: string): void {
   console.log(`  Exit code: ${latest.exit_code ?? "none"}`);
   console.log(`  Auth mode: ${latest.auth_mode || "unknown"}`);
   console.log(`  Commit:    ${latest.commit_sha || "none"}`);
+  console.log("");
+
+  // Cost section
+  if (latest.cost_usd === null && latest.model === null) {
+    console.log("Cost: no data captured");
+  } else if (latest.model) {
+    console.log("Cost:");
+    console.log(`  Model              ${latest.model}`);
+    console.log(`  Input tokens       ${formatNumber(latest.input_tokens)}`);
+    console.log(`  Output tokens      ${formatNumber(latest.output_tokens)}`);
+    console.log(`  Cache read         ${formatNumber(latest.cache_read_tokens)}`);
+    console.log(`  Cache write        ${formatNumber(latest.cache_write_tokens)}`);
+
+    if (latest.auth_mode_cost === 'api') {
+      console.log(`  Cost               ${formatCost(latest.cost_usd)}  (api)`);
+    } else if (latest.auth_mode_cost === 'max') {
+      console.log(`  Cost               ${formatCost(latest.cost_usd)} equivalent  (max)`);
+    } else {
+      console.log(`  Cost               ${formatCost(latest.cost_usd)}`);
+    }
+  } else {
+    console.log("Cost: no data captured");
+  }
   console.log("");
 
   console.log(`Merge: ${latest.merge_decision}`);
