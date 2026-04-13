@@ -1,7 +1,7 @@
 import { defineConfig } from "tsup";
 
 export default defineConfig({
-  entry: ["src/index.ts", "src/cost/parser.ts"],
+  entry: ["src/index.ts", "src/cost/parser.ts", "src/cost/pricing.ts"],
   format: ["esm"],
   target: "node18",
   bundle: true,
