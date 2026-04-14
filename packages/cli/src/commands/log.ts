@@ -1,5 +1,5 @@
 import type { Command } from "commander";
-import type Database from "better-sqlite3";
+import type { Database } from "../db/connection.js";
 import path from "node:path";
 import { existsSync, readFileSync } from "node:fs";
 import chalk from "chalk";

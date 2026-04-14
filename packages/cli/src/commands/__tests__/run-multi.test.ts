@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import Database from "better-sqlite3";
+import { openDb, type Database } from "../../db/connection.js";
 import { migrate } from "../../db/migrate.js";
 
 vi.mock("../../engine/orchestrator.js", () => ({
@@ -60,15 +60,14 @@ import { runAllProjects } from "../run.js";
 import { executeRun } from "../../engine/orchestrator.js";
 import { getAllProjects } from "../../db/queries.js";
 
-function createDb(): InstanceType<typeof Database> {
-  const db = new Database(":memory:");
-  db.pragma("foreign_keys = ON");
+function createDb(): Database {
+  const db = openDb(":memory:", { runMigrations: false });
   migrate(db);
   return db;
 }
 
 describe("run --all multi-project", () => {
-  let db: InstanceType<typeof Database>;
+  let db: Database;
   let logs: string[];
   let consoleSpy: ReturnType<typeof vi.spyOn>;
 

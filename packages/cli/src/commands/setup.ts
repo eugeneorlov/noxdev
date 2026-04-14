@@ -53,7 +53,7 @@ async function runSetup(opts: SetupOptions = {}): Promise<void> {
 
   if (major >= 25) {
     console.error(chalk.red(`✖ Node ${process.versions.node} is not supported.`));
-    console.error(chalk.gray('  noxdev depends on better-sqlite3 which lacks prebuilt binaries for Node 25+.'));
+    console.error(chalk.gray('  noxdev uses node:sqlite which requires Node 20-24.'));
     console.error(chalk.gray('  Install Node 22 LTS: brew install node@22 (macOS) or nvm install 22'));
     process.exit(1);
   }

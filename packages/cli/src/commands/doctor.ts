@@ -4,7 +4,7 @@ import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import chalk from "chalk";
-import Database from "better-sqlite3";
+import { openDb } from "../db/connection.js";
 
 interface CheckResult {
   name: string;
@@ -52,7 +52,7 @@ export function registerDoctor(program: Command): void {
           return { passed: false, message: `Node 20+ required, found ${version}` };
         }
         if (major >= 25) {
-          return { passed: false, message: `Node ${version} not supported (better-sqlite3 has no prebuilts for 25+). Install Node 22 LTS.` };
+          return { passed: false, message: `Node ${version} not supported (node:sqlite needs 20-24). Install Node 22 LTS.` };
         }
         if (major > 22) {
           return { passed: true, message: `${version} (untested, supported: 20.x, 22.x LTS)` };
@@ -112,7 +112,7 @@ export function registerDoctor(program: Command): void {
         }
 
         try {
-          const db = new Database(dbPath, { readonly: true });
+          const db = openDb(dbPath, { readonly: true });
           const result = db.prepare("SELECT count(*) as count FROM projects").get() as { count: number };
           db.close();
           return { passed: true, message: `${result.count} projects registered` };

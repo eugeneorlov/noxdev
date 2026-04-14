@@ -1,4 +1,4 @@
-import type Database from "better-sqlite3";
+import type { Database } from "../db/connection.js";
 import chalk from "chalk";
 import { getAllProjects, getLatestRun, getTaskResults } from "../db/queries.js";
 
@@ -31,7 +31,7 @@ interface RunRow {
   status: string;
 }
 
-export function getAllProjectSummaries(db: Database.Database): ProjectSummary[] {
+export function getAllProjectSummaries(db: Database): ProjectSummary[] {
   const projects = getAllProjects(db) as ProjectRow[];
   const summaries: ProjectSummary[] = [];
 

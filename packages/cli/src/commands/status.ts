@@ -1,5 +1,5 @@
 import type { Command } from "commander";
-import type Database from "better-sqlite3";
+import type { Database } from "../db/connection.js";
 import chalk from "chalk";
 import { getDb } from "../db/index.js";
 import {

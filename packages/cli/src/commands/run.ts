@@ -4,7 +4,7 @@ import { homedir } from "node:os";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { spawn, execSync } from "node:child_process";
 import chalk from "chalk";
-import type Database from "better-sqlite3";
+import type { Database } from "../db/connection.js";
 import { getDb } from "../db/index.js";
 import { getAllProjects, getProject, abortOrphanedRuns } from "../db/queries.js";
 import { loadProjectConfig } from "../config/index.js";

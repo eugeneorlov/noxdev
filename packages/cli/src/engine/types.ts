@@ -1,4 +1,4 @@
-import type Database from "better-sqlite3";
+import type { Database } from "../db/connection.js";
 import type { ProjectConfig } from "../config/types.js";
 import type { AuthResult } from "../auth/index.js";
 
@@ -9,7 +9,7 @@ export interface RunContext {
   projectGitDir: string;
   gitTargetPath: string;
   runId: string;
-  db: Database.Database;
+  db: Database;
   auth: AuthResult;
 }
 
