@@ -7,7 +7,7 @@ import {
   insertTaskResult,
   insertTaskCache,
 } from "../../db/queries.js";
-import { showTaskLog } from "../log.js";
+import { logCommand } from "../log.js";
 
 function createDb(): InstanceType<typeof Database> {
   const db = new Database(":memory:");
@@ -41,21 +41,38 @@ const TASK_DEFAULTS = {
 describe("log command", () => {
   let db: InstanceType<typeof Database>;
   let logs: string[];
+  let errorLogs: string[];
 
   beforeEach(() => {
     db = createDb();
     seedProject(db);
     logs = [];
+    errorLogs = [];
+
+    // Mock console.log and console.error
     vi.spyOn(console, "log").mockImplementation((...args: unknown[]) => {
       logs.push(args.map(String).join(" "));
     });
+    vi.spyOn(console, "error").mockImplementation((...args: unknown[]) => {
+      errorLogs.push(args.map(String).join(" "));
+    });
+
+    // Mock process.exit to prevent tests from actually exiting
+    vi.spyOn(process, "exit").mockImplementation((code?: number) => {
+      throw new Error(`process.exit(${code})`);
+    });
+
+    // Mock getDb to return our test database
+    vi.doMock("../../db/index.js", () => ({
+      getDb: () => db,
+    }));
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
-  it("shows all fields for a single execution", () => {
+  it("shows task detail when called with project and taskId", async () => {
     insertRun(db, {
       id: "run-1",
       projectId: "proj-1",
@@ -100,7 +117,7 @@ describe("log command", () => {
       diffFile: "/tmp/logs/run-1/T3/diff-attempt-1.patch",
     });
 
-    showTaskLog(db, "T3");
+    await logCommand("proj-1", "T3");
 
     const output = logs.join("\n");
     expect(output).toContain("noxdev log:");
@@ -119,7 +136,6 @@ describe("log command", () => {
     expect(output).toContain("240s");
     expect(output).toContain("Exit code: 0");
     expect(output).toContain("abc111");
-    expect(output).toContain("pending");
     expect(output).toContain("/tmp/logs/run-1/T3/attempt-1.log");
     expect(output).toContain("/tmp/logs/run-1/T3/critic-attempt-1.log");
     expect(output).toContain("/tmp/logs/run-1/T3/diff-attempt-1.patch");
@@ -127,41 +143,99 @@ describe("log command", () => {
     expect(output).not.toContain("History:");
   });
 
-  it("shows history section for multiple executions", () => {
+  it("lists tasks when called with project only", async () => {
     insertRun(db, {
       id: "run-1",
       projectId: "proj-1",
-      startedAt: "2026-03-23T08:00:00",
+      startedAt: "2026-03-23T10:00:00",
+      authMode: "max",
+      totalTasks: 2,
+      commitBefore: "abc123",
+      logFile: "/tmp/run.log",
+    });
+    insertTaskResult(db, {
+      ...TASK_DEFAULTS,
+      runId: "run-1",
+      taskId: "T1",
+      title: "Fix bug Y",
+      status: "completed",
+      commitSha: "xyz999",
+      startedAt: "2026-03-23T10:01:00",
+      finishedAt: "2026-03-23T10:05:00",
+      durationSeconds: 240,
+    });
+    insertTaskResult(db, {
+      ...TASK_DEFAULTS,
+      runId: "run-1",
+      taskId: "T2",
+      title: "Add feature Z",
+      status: "failed",
+      exitCode: 1,
+      commitSha: null,
+      startedAt: "2026-03-23T10:06:00",
+      finishedAt: "2026-03-23T10:10:00",
+      durationSeconds: 180,
+    });
+
+    await logCommand("proj-1");
+
+    const output = logs.join("\n");
+    expect(output).toContain("noxdev log: Test Project");
+    expect(output).toContain("run run-1");
+    expect(output).toContain("1/2 tasks completed, 1 failed");
+    expect(output).toContain("T1  COMPLETED");
+    expect(output).toContain("T2  FAILED");
+    expect(output).toContain("Fix bug Y");
+    expect(output).toContain("Add feature Z");
+    expect(output).toContain("240s");
+    expect(output).toContain("180s");
+    expect(output).toContain("xyz999".slice(0, 7));
+    expect(output).toContain("For detail: noxdev log proj-1");
+  });
+
+  it("shows usage help when no project provided and not in worktree", async () => {
+    await logCommand();
+
+    const output = logs.join("\n");
+    expect(output).toContain("Usage: noxdev log <project> [task-id]");
+    expect(output).toContain("noxdev log mit-nexus");
+    expect(output).toContain("Run from inside a project worktree to infer");
+  });
+
+  it("exits with error for unknown project", async () => {
+    await expect(async () => {
+      await logCommand("unknown-project");
+    }).rejects.toThrow("process.exit(1)");
+
+    const errorOutput = errorLogs.join("\n");
+    expect(errorOutput).toContain("✖ No such project: \"unknown-project\"");
+    expect(errorOutput).toContain("Registered projects:");
+    expect(errorOutput).toContain("proj-1  (Test Project)");
+  });
+
+  it("shows no runs message for project with no runs", async () => {
+    seedProject(db, "proj-2", "Empty Project");
+
+    await logCommand("proj-2");
+
+    const output = logs.join("\n");
+    expect(output).toContain("No runs recorded for proj-2. Run: noxdev run proj-2");
+  });
+
+  it("exits with error for unknown task in project", async () => {
+    insertRun(db, {
+      id: "run-1",
+      projectId: "proj-1",
+      startedAt: "2026-03-23T10:00:00",
       authMode: "max",
       totalTasks: 1,
       commitBefore: "abc123",
       logFile: "/tmp/run.log",
     });
-    insertRun(db, {
-      id: "run-2",
-      projectId: "proj-1",
-      startedAt: "2026-03-23T10:00:00",
-      authMode: "max",
-      totalTasks: 1,
-      commitBefore: "def456",
-      logFile: "/tmp/run2.log",
-    });
     insertTaskResult(db, {
       ...TASK_DEFAULTS,
       runId: "run-1",
-      taskId: "T5",
-      title: "Fix bug Y",
-      status: "failed",
-      exitCode: 1,
-      commitSha: null,
-      startedAt: "2026-03-23T08:01:00",
-      finishedAt: "2026-03-23T08:10:00",
-      durationSeconds: 540,
-    });
-    insertTaskResult(db, {
-      ...TASK_DEFAULTS,
-      runId: "run-2",
-      taskId: "T5",
+      taskId: "T1",
       title: "Fix bug Y",
       status: "completed",
       commitSha: "xyz999",
@@ -170,26 +244,16 @@ describe("log command", () => {
       durationSeconds: 240,
     });
 
-    showTaskLog(db, "T5");
+    await expect(async () => {
+      await logCommand("proj-1", "T99");
+    }).rejects.toThrow("process.exit(1)");
 
-    const output = logs.join("\n");
-    expect(output).toContain("Latest run: run-2");
-    expect(output).toContain("COMPLETED");
-    expect(output).toContain("History:");
-    expect(output).toContain("Run run-2:");
-    expect(output).toContain("Run run-1:");
-    expect(output).toContain("540s");
-    expect(output).toContain("240s");
+    const errorOutput = errorLogs.join("\n");
+    expect(errorOutput).toContain("✖ No task T99 in most recent run of proj-1");
+    expect(errorOutput).toContain("Last run had: T1");
   });
 
-  it("shows 'not found' for unknown task-id", () => {
-    showTaskLog(db, "T99");
-
-    const output = logs.join("\n");
-    expect(output).toContain("No results found for task: T99");
-  });
-
-  it("shows spec from tasks cache", () => {
+  it("shows spec from tasks cache in detail mode", async () => {
     insertRun(db, {
       id: "run-1",
       projectId: "proj-1",
@@ -223,7 +287,7 @@ describe("log command", () => {
       durationSeconds: 240,
     });
 
-    showTaskLog(db, "T7");
+    await logCommand("proj-1", "T7");
 
     const output = logs.join("\n");
     expect(output).toContain("Spec:");
