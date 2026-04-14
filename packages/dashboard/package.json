@@ -22,8 +22,7 @@
     "class-variance-authority": "^0.7.0",
     "lucide-react": "^0.321.0",
     "express": "*",
-    "cors": "*",
-    "better-sqlite3": "*"
+    "cors": "*"
   },
   "devDependencies": {
     "@types/react": "^19.0.10",
@@ -33,7 +32,6 @@
     "typescript": "^5.7.3",
     "@types/express": "*",
     "@types/cors": "*",
-    "@types/better-sqlite3": "*",
     "tsup": "*"
   }
 }
