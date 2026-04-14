@@ -280,7 +280,7 @@
   - Modify the existing Node version check (step A1) or Docker checks.
 
 ## T8: Doctor adds "Claude Code CLI in PATH" check
-- STATUS: pending
+- STATUS: done
 - FILES: packages/cli/src/commands/doctor.ts
 - VERIFY: cd packages/cli && pnpm build && node dist/index.js doctor
 - CRITIC: review
@@ -323,7 +323,7 @@
   triggering OAuth).
 
 ## T9: Doctor adds "node:sqlite available" check
-- STATUS: pending
+- STATUS: done
 - FILES: packages/cli/src/commands/doctor.ts
 - VERIFY: cd packages/cli && pnpm build && node dist/index.js doctor | grep -q "node:sqlite"
 - CRITIC: skip
@@ -361,7 +361,7 @@
   if it directly imports better-sqlite3 still. Verify and update if so.
 
 ## T10: Update README.md and packages/cli/README.md for v1.3.0
-- STATUS: pending
+- STATUS: done
 - FILES: README.md, packages/cli/README.md
 - VERIFY: ! grep -rni "better-sqlite3\|npm rebuild" README.md packages/cli/README.md && grep -q "Node.js >= 24" README.md && grep -qi "WSL2" README.md
 - CRITIC: review
@@ -394,7 +394,7 @@
   - Anything outside the Requirements/badge sections unless explicitly listed above.
 
 ## T11: CHANGELOG entry for v1.3.0
-- STATUS: pending
+- STATUS: done
 - FILES: CHANGELOG.md, packages/cli/package.json, packages/dashboard/package.json
 - VERIFY: grep -q "## \[1.3.0\]" CHANGELOG.md && grep -q '"version": "1.3.0"' packages/cli/package.json
 - CRITIC: skip
