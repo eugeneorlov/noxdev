@@ -59,10 +59,11 @@ export function runTaskInDocker(
 export function captureDiff(
   worktreeDir: string,
   outputFile: string,
+  preTaskSha: string,
 ): boolean {
   const scriptPath = join(resolveScriptsDir(), "docker-capture-diff.sh");
 
-  execFileSync(scriptPath, [worktreeDir, outputFile], {
+  execFileSync(scriptPath, [worktreeDir, outputFile, preTaskSha], {
     stdio: "inherit",
   });
 

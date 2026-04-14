@@ -325,7 +325,7 @@ async function executeTask(
   let diffFile: string | null = null;
 
   if (task.critic === "review" && status === "COMPLETED") {
-    const criticResult = await runCritic(ctx, task, logDir, attempt, claudeJsonSrc, claudeSnapshot);
+    const criticResult = await runCritic(ctx, task, logDir, attempt, claudeJsonSrc, claudeSnapshot, lastSha);
     criticLogFile = criticResult.criticLogFile;
     diffFile = criticResult.diffFile;
 
@@ -425,6 +425,7 @@ async function runCritic(
   attempt: number,
   claudeJsonSrc: string,
   claudeSnapshot: string,
+  preTaskSha: string,
 ): Promise<{
   rejected: boolean;
   reason: string;
@@ -437,14 +438,26 @@ async function runCritic(
   const diffOutputFile = join(taskLogDir, `diff-attempt-${attempt}.patch`);
 
   // Capture diff
-  const hasDiff = captureDiff(ctx.worktreeDir, diffOutputFile);
-  if (!hasDiff) {
-    console.log(chalk.yellow("  ⚠ No diff to review, skipping critic"));
-    return { rejected: false, reason: "", criticLogFile: null, diffFile: null };
-  }
+  const hasDiff = captureDiff(ctx.worktreeDir, diffOutputFile, preTaskSha);
 
   // Read diff content
   const diffContent = readFileSync(diffOutputFile, "utf-8");
+
+  // Empty-diff guardrail: if the committed section is empty AND the uncommitted section
+  // contains only TASKS.md changes, the agent didn't produce reviewable work. Skip critic
+  // instead of sending an empty diff for rejection.
+  const committedSection = diffContent.split('---UNCOMMITTED---')[0] || '';
+  const committedHasWork = committedSection.replace('---COMMITTED---', '').trim().length > 0;
+  if (!committedHasWork) {
+    const uncommittedMatch = diffContent.match(/---UNCOMMITTED---\n([\s\S]*?)---STAGED---/);
+    const uncommittedBody = uncommittedMatch ? uncommittedMatch[1].trim() : '';
+    const onlyTasksMd = uncommittedBody.length === 0 ||
+      (uncommittedBody.includes('TASKS.md') && !uncommittedBody.match(/^diff --git.*(?<!TASKS\.md)$/m));
+    if (onlyTasksMd) {
+      console.log(chalk.yellow("  ⚠ No substantive diff to review (only TASKS.md metadata), skipping critic"));
+      return { rejected: false, reason: "empty diff", criticLogFile: null, diffFile: diffOutputFile };
+    }
+  }
 
   // Build critic prompt
   const criticPromptContent = buildCriticPrompt(task, diffContent);
