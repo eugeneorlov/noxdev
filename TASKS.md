@@ -185,7 +185,7 @@
   If tests pass, move on. If they fail, fix the test honestly.
 
 ## T6: Drop better-sqlite3 dependency, kill postinstall, bump Node minimum to 24
-- STATUS: pending
+- STATUS: failed
 - FILES: packages/cli/package.json, packages/dashboard/package.json, package.json, packages/cli/scripts/check-native.js
 - VERIFY: cd packages/cli && pnpm install && pnpm build && pnpm test && ! grep -q "better-sqlite3" package.json && ! grep -q "check-native" package.json && [ ! -f scripts/check-native.js ]
 - CRITIC: review
@@ -216,7 +216,7 @@
     constraint is on the user's host machine, not the container).
 
 ## T7: noxdev setup auto-installs @anthropic-ai/claude-code and prompts for login if unauth
-- STATUS: pending
+- STATUS: done
 - FILES: packages/cli/src/commands/setup.ts
 - VERIFY: cd packages/cli && pnpm build && node dist/index.js setup --help
 - CRITIC: review

@@ -161,7 +161,17 @@ export function registerDoctor(program: Command): void {
         }
       }));
 
-      // 11. Claude credentials
+      // 11. Claude Code CLI in PATH
+      checks.push(runCheck("Claude Code CLI in PATH", true, 'prerequisites', () => {
+        try {
+          const output = execSync("claude --version", { encoding: "utf8" }).trim();
+          return { passed: true, message: output };
+        } catch {
+          return { passed: false, message: "Claude Code CLI not found. Install from: https://claude.ai/code" };
+        }
+      }));
+
+      // 12. Claude credentials
       checks.push(runCheck("Claude credentials", true, 'prerequisites', () => {
         const claudePath = join(homedir(), ".claude.json");
         if (existsSync(claudePath)) {
