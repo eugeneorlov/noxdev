@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import Database from "better-sqlite3";
+import { openDb, type Database } from "../connection.js";
 import { migrate } from "../migrate.js";
 import {
   insertRun,
@@ -12,14 +12,13 @@ import {
   getAllProjects,
 } from "../queries.js";
 
-function createDb(): InstanceType<typeof Database> {
-  const db = new Database(":memory:");
-  db.pragma("foreign_keys = ON");
+function createDb(): Database {
+  const db = openDb(":memory:", { runMigrations: false });
   migrate(db);
   return db;
 }
 
-function seedProject(db: InstanceType<typeof Database>, id = "proj-1") {
+function seedProject(db: Database, id = "proj-1") {
   db.prepare(
     `INSERT INTO projects (id, display_name, repo_path, worktree_path, branch)
      VALUES (?, ?, ?, ?, ?)`,
@@ -55,7 +54,7 @@ const TASK_RESULT = {
 };
 
 describe("queries", () => {
-  let db: InstanceType<typeof Database>;
+  let db: Database;
 
   beforeEach(() => {
     db = createDb();

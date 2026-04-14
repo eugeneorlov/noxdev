@@ -1,7 +1,7 @@
-import type Database from "better-sqlite3";
+import type { Database } from "./connection.js";
 
 export function insertRun(
-  db: Database.Database,
+  db: Database,
   run: {
     id: string;
     projectId: string;
@@ -27,7 +27,7 @@ export function insertRun(
 }
 
 export function updateRunFinished(
-  db: Database.Database,
+  db: Database,
   runId: string,
   updates: {
     finishedAt: string;
@@ -54,7 +54,7 @@ export function updateRunFinished(
 }
 
 export function insertTaskCache(
-  db: Database.Database,
+  db: Database,
   runId: string,
   tasks: Array<{
     taskId: string;
@@ -70,16 +70,21 @@ export function insertTaskCache(
     `INSERT INTO tasks (run_id, task_id, title, files, verify, critic, spec, status_before)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
   );
-  const insertMany = db.transaction((rows: typeof tasks) => {
-    for (const t of rows) {
+
+  db.exec('BEGIN');
+  try {
+    for (const t of tasks) {
       stmt.run(runId, t.taskId, t.title, t.files, t.verify, t.critic, t.spec, t.statusBefore);
     }
-  });
-  insertMany(tasks);
+    db.exec('COMMIT');
+  } catch (error) {
+    db.exec('ROLLBACK');
+    throw error;
+  }
 }
 
 export function insertTaskResult(
-  db: Database.Database,
+  db: Database,
   result: {
     runId: string;
     taskId: string;
@@ -139,7 +144,7 @@ export function insertTaskResult(
   );
 }
 
-export function getLatestRun(db: Database.Database, projectId: string) {
+export function getLatestRun(db: Database, projectId: string) {
   return (
     db
       .prepare(`SELECT * FROM runs WHERE project_id = ? ORDER BY started_at DESC LIMIT 1`)
@@ -147,15 +152,15 @@ export function getLatestRun(db: Database.Database, projectId: string) {
   );
 }
 
-export function getTaskResults(db: Database.Database, runId: string) {
+export function getTaskResults(db: Database, runId: string) {
   return db.prepare(`SELECT * FROM task_results WHERE run_id = ?`).all(runId);
 }
 
-export function getProject(db: Database.Database, projectId: string) {
+export function getProject(db: Database, projectId: string) {
   return db.prepare(`SELECT * FROM projects WHERE id = ?`).get(projectId) ?? null;
 }
 
-export function getAllProjects(db: Database.Database) {
+export function getAllProjects(db: Database) {
   return db
     .prepare(
       `SELECT p.*,
@@ -176,7 +181,7 @@ export function getAllProjects(db: Database.Database) {
     .all();
 }
 
-export function abortOrphanedRuns(db: Database.Database): number {
+export function abortOrphanedRuns(db: Database): number {
   const result = db.prepare(
     `UPDATE runs
      SET status = 'aborted', finished_at = datetime('now')
