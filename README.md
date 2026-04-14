@@ -10,7 +10,7 @@
 
 Ship code while you sleep
 
-[![npm version](https://img.shields.io/badge/npm-0.1.0-green.svg)](https://www.npmjs.com/package/noxdev)
+[![npm version](https://img.shields.io/badge/npm-1.2.0-green.svg)](https://www.npmjs.com/package/noxdev)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen.svg)](https://nodejs.org/)
 
