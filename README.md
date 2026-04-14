@@ -10,9 +10,9 @@
 
 Ship code while you sleep
 
-[![npm version](https://img.shields.io/badge/npm-1.2.0-green.svg)](https://www.npmjs.com/package/noxdev)
+[![npm version](https://img.shields.io/badge/npm-1.3.0-green.svg)](https://www.npmjs.com/package/noxdev)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Node.js](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen.svg)](https://nodejs.org/)
+[![Node.js](https://img.shields.io/badge/node-%3E%3D24.0.0-brightgreen.svg)](https://nodejs.org/)
 
 ## What is noxdev
 
@@ -169,11 +169,13 @@ You can override pricing rates by creating `~/.noxdev/pricing.json`:
 
 ## Requirements
 
-- Node.js >= 20 < 23
+- Node.js >= 24
 - Docker (with daemon running)
 - Git
 - Claude CLI (`claude login` required)
 - SOPS + age (optional, for secrets encryption)
+
+**Platform support**: Linux, macOS, and Windows (via WSL2)
 
 ## Built With
 

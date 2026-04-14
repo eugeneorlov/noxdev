@@ -4,7 +4,7 @@ Autonomous overnight coding agent orchestrator — ship code while you sleep.
 
 ## Requirements
 
-- **Node.js**: Requires Node.js 20.x or 22.x (LTS versions only)
+- **Node.js**: Requires Node.js >= 24
 - Docker (with daemon running)
 - Git
 - Claude CLI (`claude login` required)
