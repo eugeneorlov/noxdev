@@ -56,7 +56,6 @@ Tasks are defined in `TASKS.md` using this format:
 - FILES: src/auth.ts, src/middleware/auth.ts
 - VERIFY: npm test && npm run build
 - CRITIC: review
-- PUSH: gate
 - SPEC: Implement JWT-based authentication for the API.
   Add login/logout endpoints with bcrypt password hashing.
   Create middleware for route protection.
@@ -68,16 +67,7 @@ Tasks are defined in `TASKS.md` using this format:
 - `FILES`: Files the task should focus on (hints, not constraints)
 - `VERIFY`: Command to run after completion to validate the task
 - `CRITIC`: `skip` | `review` (whether to run critic agent review)
-- `PUSH`: Push strategy for the commit (see table below)
 - `SPEC`: Detailed task specification
-
-**Push strategies:**
-
-| Strategy | Behavior |
-|----------|----------|
-| `auto` | Auto-merge if verify passes and critic approves |
-| `gate` | Commit but require manual approval before merge |
-| `manual` | No auto-commit, human review required |
 
 ## Architecture
 
@@ -95,13 +85,11 @@ graph TB
     I --> J[Docker Containment]
     I --> K[Worktree Isolation]
     I --> L[Critic Agent]
-    I --> M[Gated Push]
-    I --> N[No Auto-Push]
 ```
 
 The flow: **TASKS.md** → **noxdev CLI** → **Docker container** (Claude Code agent) → **git commit** → **morning review** (CLI or dashboard) → **merge to main**.
 
-Safety layers include Docker containment, worktree isolation, critic agent review, gated push controls, and a strict no auto-push policy.
+Safety layers include Docker containment, worktree isolation, and critic agent review. The agent always commits its work to the worktree branch, which stays isolated until you decide to merge.
 
 ## CLI Commands
 

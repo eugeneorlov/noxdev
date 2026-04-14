@@ -45,7 +45,6 @@ CREATE TABLE IF NOT EXISTS task_results (
   exit_code INTEGER,
   auth_mode TEXT,
   critic_mode TEXT DEFAULT 'review',
-  push_mode TEXT DEFAULT 'auto',
   attempt INTEGER DEFAULT 1,
   commit_sha TEXT,
   started_at TEXT,
@@ -75,7 +74,6 @@ CREATE TABLE IF NOT EXISTS tasks (
   files TEXT,
   verify TEXT,
   critic TEXT DEFAULT 'review',
-  push TEXT DEFAULT 'auto',
   spec TEXT,
   status_before TEXT DEFAULT 'pending',
   UNIQUE(run_id, task_id)
@@ -126,7 +124,6 @@ export function migrate(db: Database.Database): void {
       files TEXT,
       verify TEXT,
       critic TEXT DEFAULT 'review',
-      push TEXT DEFAULT 'auto',
       spec TEXT,
       status_before TEXT DEFAULT 'pending',
       UNIQUE(run_id, task_id)
@@ -158,7 +155,6 @@ export function migrate(db: Database.Database): void {
           exit_code INTEGER,
           auth_mode TEXT,
           critic_mode TEXT DEFAULT 'review',
-          push_mode TEXT DEFAULT 'auto',
           attempt INTEGER DEFAULT 1,
           commit_sha TEXT,
           started_at TEXT,
@@ -179,14 +175,14 @@ export function migrate(db: Database.Database): void {
         -- Copy existing data, excluding merge columns and setting new columns to NULL
         INSERT INTO task_results_new (
           id, run_id, task_id, title, status, exit_code, auth_mode, critic_mode,
-          push_mode, attempt, commit_sha, started_at, finished_at, duration_seconds,
+          attempt, commit_sha, started_at, finished_at, duration_seconds,
           dev_log_file, critic_log_file, diff_file,
           input_tokens, output_tokens, cache_read_tokens, cache_write_tokens,
           model, auth_mode_cost, cost_usd
         )
         SELECT
           id, run_id, task_id, title, status, exit_code, auth_mode, critic_mode,
-          push_mode, attempt, commit_sha, started_at, finished_at, duration_seconds,
+          attempt, commit_sha, started_at, finished_at, duration_seconds,
           dev_log_file, critic_log_file, diff_file,
           NULL, NULL, NULL, NULL, NULL, NULL, NULL
         FROM task_results;
@@ -205,6 +201,106 @@ export function migrate(db: Database.Database): void {
 
       console.log('Migration completed successfully.');
     }
+
+    // Check if task_results has push_mode column and remove it
+    const resultColumns = db.prepare("PRAGMA table_info(task_results)").all();
+    const hasPushMode = resultColumns.some((col: any) => col.name === 'push_mode');
+
+    if (hasPushMode) {
+      console.log('Migrating task_results table to remove push_mode column...');
+
+      db.exec(`
+        BEGIN;
+
+        -- Create new table without push_mode
+        CREATE TABLE task_results_temp (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          run_id TEXT NOT NULL REFERENCES runs(id),
+          task_id TEXT NOT NULL,
+          title TEXT NOT NULL,
+          status TEXT NOT NULL,
+          exit_code INTEGER,
+          auth_mode TEXT,
+          critic_mode TEXT DEFAULT 'review',
+          attempt INTEGER DEFAULT 1,
+          commit_sha TEXT,
+          started_at TEXT,
+          finished_at TEXT,
+          duration_seconds INTEGER,
+          dev_log_file TEXT,
+          critic_log_file TEXT,
+          diff_file TEXT,
+          input_tokens INTEGER,
+          output_tokens INTEGER,
+          cache_read_tokens INTEGER,
+          cache_write_tokens INTEGER,
+          model TEXT,
+          auth_mode_cost TEXT,
+          cost_usd REAL
+        );
+
+        -- Copy data excluding push_mode
+        INSERT INTO task_results_temp SELECT
+          id, run_id, task_id, title, status, exit_code, auth_mode, critic_mode,
+          attempt, commit_sha, started_at, finished_at, duration_seconds,
+          dev_log_file, critic_log_file, diff_file,
+          input_tokens, output_tokens, cache_read_tokens, cache_write_tokens,
+          model, auth_mode_cost, cost_usd
+        FROM task_results;
+
+        -- Replace old table
+        DROP TABLE task_results;
+        ALTER TABLE task_results_temp RENAME TO task_results;
+
+        -- Recreate indexes
+        CREATE INDEX IF NOT EXISTS idx_task_results_run ON task_results(run_id);
+        CREATE INDEX IF NOT EXISTS idx_task_results_status ON task_results(status);
+        CREATE INDEX IF NOT EXISTS idx_task_results_started ON task_results(started_at);
+
+        COMMIT;
+      `);
+
+      console.log('push_mode column migration completed successfully.');
+    }
+
+    // Check if tasks table has push column and remove it
+    const taskColumns = db.prepare("PRAGMA table_info(tasks)").all();
+    const taskHasPush = taskColumns.some((col: any) => col.name === 'push');
+
+    if (taskHasPush) {
+      console.log('Migrating tasks table to remove push column...');
+
+      db.exec(`
+        BEGIN;
+
+        -- Create new tasks table without push
+        CREATE TABLE tasks_temp (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          run_id TEXT NOT NULL REFERENCES runs(id),
+          task_id TEXT NOT NULL,
+          title TEXT NOT NULL,
+          files TEXT,
+          verify TEXT,
+          critic TEXT DEFAULT 'review',
+          spec TEXT,
+          status_before TEXT DEFAULT 'pending',
+          UNIQUE(run_id, task_id)
+        );
+
+        -- Copy data excluding push
+        INSERT INTO tasks_temp SELECT
+          id, run_id, task_id, title, files, verify, critic, spec, status_before
+        FROM tasks;
+
+        -- Replace old table
+        DROP TABLE tasks;
+        ALTER TABLE tasks_temp RENAME TO tasks;
+
+        COMMIT;
+      `);
+
+      console.log('push column migration completed successfully.');
+    }
   } else {
     // Table doesn't exist, create it with the new schema
     db.exec(`
@@ -217,7 +313,6 @@ export function migrate(db: Database.Database): void {
         exit_code INTEGER,
         auth_mode TEXT,
         critic_mode TEXT DEFAULT 'review',
-        push_mode TEXT DEFAULT 'auto',
         attempt INTEGER DEFAULT 1,
         commit_sha TEXT,
         started_at TEXT,

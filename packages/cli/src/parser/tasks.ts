@@ -7,12 +7,11 @@ export interface ParsedTask {
   files: string[];
   verify: string;
   critic: string;
-  push: string;
   spec: string;
 }
 
 const TASK_HEADER_RE = /^## (T\d+): (.+)$/;
-const FIELD_RE = /^- (STATUS|FILES|VERIFY|CRITIC|PUSH|SPEC): (.+)$/i;
+const FIELD_RE = /^- (STATUS|FILES|VERIFY|CRITIC|SPEC): (.+)$/i;
 
 export function parseTasks(
   content: string,
@@ -36,7 +35,6 @@ export function parseTasks(
         files: [],
         verify: '',
         critic: 'review',
-        push: 'auto',
         spec: '',
       };
       inSpec = false;
@@ -76,9 +74,6 @@ export function parseTasks(
           break;
         case 'CRITIC':
           current.critic = value.trim();
-          break;
-        case 'PUSH':
-          current.push = value.trim();
           break;
         case 'SPEC':
           current.spec = value.trimEnd();

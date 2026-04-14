@@ -11,7 +11,6 @@ describe('parseTasks', () => {
 - FILES: src/a.ts, src/b.ts
 - VERIFY: pnpm build
 - CRITIC: review
-- PUSH: gate
 - SPEC: Do the thing.`;
 
     const tasks = parseTasks(content);
@@ -23,7 +22,6 @@ describe('parseTasks', () => {
     expect(t.files).toEqual(['src/a.ts', 'src/b.ts']);
     expect(t.verify).toBe('pnpm build');
     expect(t.critic).toBe('review');
-    expect(t.push).toBe('gate');
     expect(t.spec).toBe('Do the thing.');
   });
 
@@ -95,7 +93,6 @@ describe('parseTasks', () => {
     expect(t.files).toEqual([]);
     expect(t.verify).toBe('');
     expect(t.critic).toBe('review');
-    expect(t.push).toBe('auto');
     expect(t.spec).toBe('');
   });
 

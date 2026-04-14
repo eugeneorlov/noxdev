@@ -40,7 +40,6 @@ CREATE TABLE IF NOT EXISTS task_results (
   exit_code INTEGER,
   auth_mode TEXT,
   critic_mode TEXT DEFAULT 'review',
-  push_mode TEXT DEFAULT 'auto',
   attempt INTEGER DEFAULT 1,
   commit_sha TEXT,
   started_at TEXT,
@@ -70,7 +69,6 @@ CREATE TABLE IF NOT EXISTS tasks (
   files TEXT,
   verify TEXT,
   critic TEXT DEFAULT 'review',
-  push TEXT DEFAULT 'auto',
   spec TEXT,
   status_before TEXT DEFAULT 'pending',
   UNIQUE(run_id, task_id)

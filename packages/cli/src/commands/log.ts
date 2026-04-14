@@ -14,7 +14,6 @@ interface TaskResultRow {
   exit_code: number | null;
   auth_mode: string | null;
   critic_mode: string | null;
-  push_mode: string | null;
   attempt: number;
   commit_sha: string | null;
   started_at: string | null;
@@ -37,7 +36,6 @@ interface TaskCacheRow {
   files: string | null;
   verify: string | null;
   critic: string | null;
-  push: string | null;
 }
 
 function inferProjectFromCwd(): string | null {
@@ -175,8 +173,8 @@ export async function logCommand(project?: string, taskId?: string): Promise<voi
     process.exit(1);
   }
 
-  // Query the tasks cache for spec/files/verify/critic/push fields
-  const taskCache = db.prepare('SELECT spec, files, verify, critic, push FROM tasks WHERE run_id = ? AND task_id = ?').get(mostRecentRun.id, taskId) as TaskCacheRow | undefined;
+  // Query the tasks cache for spec/files/verify/critic fields
+  const taskCache = db.prepare('SELECT spec, files, verify, critic FROM tasks WHERE run_id = ? AND task_id = ?').get(mostRecentRun.id, taskId) as TaskCacheRow | undefined;
 
   // Render the detail view (reusing existing logic but without History section)
   console.log(`noxdev log: ${chalk.bold(taskId)} — ${taskResult.title}`);
@@ -194,7 +192,7 @@ export async function logCommand(project?: string, taskId?: string): Promise<voi
 
   console.log(`Files: ${taskCache?.files || "none specified"}`);
   console.log(`Verify: ${taskCache?.verify || "none"}`);
-  console.log(`Critic: ${taskCache?.critic || taskResult.critic_mode || "review"}  Push: ${taskCache?.push || taskResult.push_mode || "auto"}`);
+  console.log(`Critic: ${taskCache?.critic || taskResult.critic_mode || "review"}`);
   console.log("");
 
   console.log("Execution:");

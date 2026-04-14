@@ -46,7 +46,6 @@ const TASK_RESULT = {
   exitCode: 0,
   authMode: "max",
   criticMode: "review",
-  pushMode: "auto",
   attempt: 1,
   commitSha: "def456",
   startedAt: "2026-03-23T10:01:00Z",
@@ -97,14 +96,12 @@ describe("queries", () => {
     expect(r.exit_code).toBe(0);
     expect(r.auth_mode).toBe("max");
     expect(r.critic_mode).toBe("review");
-    expect(r.push_mode).toBe("auto");
     expect(r.attempt).toBe(1);
     expect(r.commit_sha).toBe("def456");
     expect(r.duration_seconds).toBe(240);
     expect(r.dev_log_file).toBe("/tmp/dev.log");
     expect(r.critic_log_file).toBe("/tmp/critic.log");
     expect(r.diff_file).toBe("/tmp/diff.patch");
-    expect(r.merge_decision).toBe("pending");
   });
 
   it("updateRunFinished updates status and counts", () => {
@@ -203,7 +200,6 @@ describe("queries", () => {
         files: "src/a.ts",
         verify: "pnpm test",
         critic: "review",
-        push: "auto",
         spec: "Do the thing",
         statusBefore: "pending",
       },
@@ -213,7 +209,6 @@ describe("queries", () => {
         files: "src/b.ts",
         verify: "pnpm test",
         critic: "strict",
-        push: "manual",
         spec: "Do another thing",
         statusBefore: "pending",
       },

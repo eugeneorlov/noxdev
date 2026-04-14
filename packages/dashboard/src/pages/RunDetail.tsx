@@ -12,7 +12,6 @@ interface TaskResult {
   exit_code: number | null;
   auth_mode: string | null;
   critic_mode: string | null;
-  push_mode: string | null;
   attempt: number;
   commit_sha: string | null;
   started_at: string | null;

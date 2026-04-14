@@ -97,7 +97,6 @@ describe("log command", () => {
         files: "src/feature.ts, src/feature.test.ts",
         verify: "pnpm test",
         critic: "strict",
-        push: "manual",
         spec: "Implement feature X with full test coverage",
         statusBefore: "pending",
       },
@@ -130,7 +129,6 @@ describe("log command", () => {
     expect(output).toContain("src/feature.ts, src/feature.test.ts");
     expect(output).toContain("pnpm test");
     expect(output).toContain("strict");
-    expect(output).toContain("manual");
     expect(output).toContain("2026-03-23T10:01:00");
     expect(output).toContain("2026-03-23T10:05:00");
     expect(output).toContain("240s");
@@ -270,7 +268,6 @@ describe("log command", () => {
         files: "src/logger.ts",
         verify: "pnpm build",
         critic: "review",
-        push: "auto",
         spec: "Add structured logging\nwith JSON format\nand log levels",
         statusBefore: "pending",
       },

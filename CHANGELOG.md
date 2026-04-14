@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Removed
+- `PUSH` field from TASKS.md format. It was parsed and stored but never affected behavior.
+The agent always commits its work regardless. Existing TASKS.md files with PUSH lines
+continue to parse without error — the field is silently ignored.
+- `push_mode` column from task_results table (migrated on first run).
+- "Push:" display from `noxdev log` output.
+
 ## [1.2.0] - 2026-04-14
 
 ### Added
