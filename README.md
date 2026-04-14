@@ -31,7 +31,8 @@ noxdev init my-project --repo ~/my-repo # register a project
 # write tasks in ~/worktrees/my-project/TASKS.md
 noxdev run my-project                   # run task loop
 noxdev status my-project                # morning summary
-noxdev merge my-project                 # approve/reject commits
+# Merge when ready
+cd ~/projects/my-project && git merge noxdev/my-project
 noxdev dashboard                        # visual review UI
 ```
 
@@ -112,7 +113,7 @@ Safety layers include Docker containment, worktree isolation, critic agent revie
 | `noxdev run --overnight` | Unattended mode with extended timeouts |
 | `noxdev status <project>` | Show project status and recent execution summary |
 | `noxdev log <project>` | View detailed execution history and logs |
-| `noxdev merge <project>` | Interactive commit review and merge workflow |
+| `noxdev cost [project]` | Token usage and cost summary (global or per-project) |
 | `noxdev projects` | List all registered projects |
 | `noxdev dashboard` | Launch web UI for visual review (localhost only) |
 | `noxdev doctor` | Check prerequisites and system health |
@@ -121,11 +122,59 @@ Safety layers include Docker containment, worktree isolation, critic agent revie
 
 A React web interface for reviewing overnight work. Run `noxdev dashboard` to start the local server. The dashboard shows execution summaries, commit diffs, and provides a visual merge review workflow. Runs on localhost only for security.
 
+## Cost tracking
+
+noxdev captures token usage and cost per task from Claude Code session logs. The `noxdev cost` command provides detailed breakdowns of API consumption across all your autonomous coding work.
+
+Example output of `noxdev cost --all`:
+
+```bash
+$ noxdev cost --all
+
+=== Token Usage & Cost Summary ===
+Total projects: 3
+Total tasks completed: 47
+
+Project: web-app (15 tasks)
+  Input tokens:  127,439  ($0.51)
+  Output tokens:  89,234  ($0.89)
+  Total cost:            $1.40
+
+Project: api-server (20 tasks)  
+  Input tokens:  203,891  ($0.82)
+  Output tokens: 156,789  ($1.57)
+  Total cost:            $2.39
+
+Project: data-pipeline (12 tasks)
+  Input tokens:   89,234  ($0.36)
+  Output tokens:  67,123  ($0.67)
+  Total cost:            $1.03
+
+=== Global Total ===
+Input tokens:  420,564  ($1.69)
+Output tokens: 313,146  ($3.13)
+Total cost:           $4.82
+
+Max-equivalent cost: For reference, this work would have cost $4.82 via Claude API.
+Actual Max usage is flat-rate - this number helps track consumption.
+```
+
+The **Max-equivalent cost** shows what this usage would have cost via API. Since actual Max usage is flat-rate, the dollar amount is for reference only - it helps you understand the scale of your consumption.
+
+You can override pricing rates by creating `~/.noxdev/pricing.json`:
+
+```json
+{
+  "input_per_million": 3.0,
+  "output_per_million": 15.0
+}
+```
+
 ## Safety Model
 
 - **Docker containment**: Memory/CPU/timeout limits isolate agent execution
 - **Git worktree**: Main branch is never directly modified, always safe
-- **No auto-push ever**: All commits stay local until manual review
+- **Controlled merge workflow**: Commits stay on the worktree branch until you run git merge
 - **Critic agent review**: Optional second-pass validation of changes
 - **Circuit breaker**: 3 consecutive failures automatically pause a project
 - **SOPS + age encryption**: Secure handling of secrets and credentials

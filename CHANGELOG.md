@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-04-14
+
+### Added
+- Token usage and cost tracking per task, project, and globally
+- `noxdev cost` command with `--since` and `--all` flags
+- Cost summary on dashboard Overview and per-task detail pages
+- Pricing override via ~/.noxdev/pricing.json
+- Max-authenticated tasks show equivalent API cost for reference
+
+### Changed
+- Agent prompt now instructs the model to execute VERIFY as a real shell command
+  and report exit code honestly
+
+### Removed
+- `noxdev merge` command — spec-driven workflows don't need per-commit review.
+  Use `git merge noxdev/<project>` directly.
+- Merge review page and approve/reject UI from the dashboard
+- `merge_decision` and `merged_at` columns from the task_results table (migrated on first run)
+
 ## [1.0.3] - 2026-04-11
 
 ### Added
