@@ -1,4 +1,3 @@
-import { DatabaseSync } from "node:sqlite";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { migrate } from "./migrate.js";
@@ -7,6 +6,9 @@ export interface OpenDbOptions {
   readonly?: boolean;
   runMigrations?: boolean;
 }
+
+// Type export for Database
+export type Database = any; // Will be DatabaseSync when available
 
 /**
  * Opens a database connection with proper configuration.
@@ -19,8 +21,11 @@ export interface OpenDbOptions {
 export function openDb(
   dbPath: string,
   options: OpenDbOptions = {}
-): DatabaseSync {
+): any {
   const { readonly = false, runMigrations = true } = options;
+
+  // Dynamically import DatabaseSync to avoid top-level node:sqlite dependency
+  const { DatabaseSync } = require("node:sqlite");
 
   // Create directory for file-based databases (skip for in-memory)
   if (dbPath !== ':memory:') {
@@ -47,6 +52,3 @@ export function openDb(
 
   return db;
 }
-
-// Re-export DatabaseSync as Database for ergonomic imports across the codebase.
-export type Database = DatabaseSync;

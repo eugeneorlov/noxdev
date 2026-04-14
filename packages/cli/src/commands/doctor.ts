@@ -4,7 +4,6 @@ import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import chalk from "chalk";
-import { openDb } from "../db/connection.js";
 
 interface CheckResult {
   name: string;
@@ -60,7 +59,19 @@ export function registerDoctor(program: Command): void {
         return { passed: true, message: version };
       }));
 
-      // 2. Docker installed
+      // 2. node:sqlite available
+      checks.push(runCheck("node:sqlite available", true, 'prerequisites', () => {
+        try {
+          // Test if node:sqlite is available by running a simple script
+          const testScript = "const { DatabaseSync } = require('node:sqlite'); const db = new DatabaseSync(':memory:'); db.close(); process.exit(0);";
+          execSync(`node -e "${testScript}"`, { stdio: "pipe" });
+          return { passed: true };
+        } catch (error) {
+          return { passed: false, message: "node:sqlite not available. Update Node.js or check installation." };
+        }
+      }));
+
+      // 3. Docker installed
       checks.push(runCheck("Docker installed", true, 'prerequisites', () => {
         try {
           const output = execSync("docker --version", { encoding: "utf8" }).trim();
@@ -70,7 +81,7 @@ export function registerDoctor(program: Command): void {
         }
       }));
 
-      // 3. Docker daemon running
+      // 4. Docker daemon running
       checks.push(runCheck("Docker daemon running", true, 'prerequisites', () => {
         try {
           execSync("docker info", { stdio: "pipe" });
@@ -80,7 +91,7 @@ export function registerDoctor(program: Command): void {
         }
       }));
 
-      // 4. Docker image exists
+      // 5. Docker image exists
       checks.push(runCheck("Docker image exists", false, 'managed', () => {
         try {
           const output = execSync("docker images -q noxdev-runner:latest", { encoding: "utf8" }).trim();
@@ -94,7 +105,7 @@ export function registerDoctor(program: Command): void {
         }
       }));
 
-      // 5. noxdev config directory
+      // 6. noxdev config directory
       checks.push(runCheck("noxdev config directory", false, 'managed', () => {
         const configDir = join(homedir(), ".noxdev");
         if (existsSync(configDir)) {
@@ -104,7 +115,7 @@ export function registerDoctor(program: Command): void {
         }
       }));
 
-      // 6. SQLite database
+      // 7. SQLite database
       checks.push(runCheck("SQLite database", false, 'managed', () => {
         const dbPath = join(homedir(), ".noxdev", "ledger.db");
         if (!existsSync(dbPath)) {
@@ -112,6 +123,8 @@ export function registerDoctor(program: Command): void {
         }
 
         try {
+          // Dynamically import openDb to avoid top-level node:sqlite import issues
+          const { openDb } = require("../db/connection.js");
           const db = openDb(dbPath, { readonly: true });
           const result = db.prepare("SELECT count(*) as count FROM projects").get() as { count: number };
           db.close();
@@ -121,7 +134,7 @@ export function registerDoctor(program: Command): void {
         }
       }));
 
-      // 7. Git installed
+      // 8. Git installed
       checks.push(runCheck("Git installed", true, 'prerequisites', () => {
         try {
           execSync("git --version", { stdio: "pipe" });
@@ -131,7 +144,7 @@ export function registerDoctor(program: Command): void {
         }
       }));
 
-      // 8. SOPS installed
+      // 9. SOPS installed
       checks.push(runCheck("SOPS installed", false, 'prerequisites', () => {
         try {
           execSync("sops --version", { stdio: "pipe" });
@@ -141,7 +154,7 @@ export function registerDoctor(program: Command): void {
         }
       }));
 
-      // 9. Python3 version (informational)
+      // 10. Python3 version (informational)
       checks.push(runCheck("Python3 version", false, 'prerequisites', () => {
         try {
           const output = execSync("python3 --version", { encoding: "utf8" }).trim();
@@ -151,7 +164,7 @@ export function registerDoctor(program: Command): void {
         }
       }));
 
-      // 10. uv version (informational)
+      // 11. uv version (informational)
       checks.push(runCheck("uv version", false, 'prerequisites', () => {
         try {
           const output = execSync("uv --version", { encoding: "utf8" }).trim();
@@ -161,7 +174,7 @@ export function registerDoctor(program: Command): void {
         }
       }));
 
-      // 11. Claude Code CLI in PATH
+      // 12. Claude Code CLI in PATH
       checks.push(runCheck("Claude Code CLI in PATH", true, 'prerequisites', () => {
         try {
           const output = execSync("claude --version", { encoding: "utf8" }).trim();
@@ -171,7 +184,7 @@ export function registerDoctor(program: Command): void {
         }
       }));
 
-      // 12. Claude credentials
+      // 13. Claude credentials
       checks.push(runCheck("Claude credentials", true, 'prerequisites', () => {
         const claudePath = join(homedir(), ".claude.json");
         if (existsSync(claudePath)) {
