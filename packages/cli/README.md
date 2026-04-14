@@ -23,7 +23,6 @@ noxdev init my-project --repo ~/my-repo # register a project
 # write tasks in ~/worktrees/my-project/TASKS.md
 noxdev run my-project                   # run task loop
 noxdev status my-project                # morning summary
-noxdev merge my-project                 # approve/reject commits
 noxdev dashboard                        # visual review UI
 ```
 

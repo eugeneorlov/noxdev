@@ -8,7 +8,7 @@
 #               README line 35 (git merge workflow), DECISIONS.md, CHANGELOG.md
 
 ## T1: Stop the runtime crash — remove dead merge code from queries and consumers
-- STATUS: pending
+- STATUS: done
 - FILES: packages/cli/src/db/queries.ts, packages/cli/src/commands/status.ts, packages/cli/src/engine/summary.ts
 - VERIFY: cd packages/cli && pnpm build && pnpm test && ! grep -rn "merge_decision\|merged_at\|getPendingMerge\|updateMergeDecision\|pendingMerge" src/ --exclude-dir=__tests__ --exclude=migrate.ts
 - CRITIC: skip
@@ -37,7 +37,7 @@
   Do NOT touch packages/cli/src/merge/ — that's T2.
 
 ## T2: Delete the merge/ directory and clean test references
-- STATUS: pending
+- STATUS: done
 - FILES: packages/cli/src/merge/interactive.ts, packages/cli/src/merge/__tests__/merge-logic.test.ts, packages/cli/src/db/__tests__/queries.test.ts, packages/cli/src/commands/__tests__/status.test.ts
 - VERIFY: cd packages/cli && pnpm build && pnpm test && [ ! -d src/merge ] && ! grep -rn "getPendingMerge\|updateMergeDecision" src/
 - CRITIC: skip

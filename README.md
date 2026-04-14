@@ -108,7 +108,7 @@ Safety layers include Docker containment, worktree isolation, and critic agent r
 
 ## The Morning Dashboard
 
-A React web interface for reviewing overnight work. Run `noxdev dashboard` to start the local server. The dashboard shows execution summaries, commit diffs, and provides a visual merge review workflow. Runs on localhost only for security.
+A React web interface for reviewing overnight work. Run `noxdev dashboard` to start the local server. The dashboard shows execution summaries and commit diffs. Runs on localhost only for security.
 
 ## Cost tracking
 
