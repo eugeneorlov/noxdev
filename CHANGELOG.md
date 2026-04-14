@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-04-14
+
+### Added
+- Enhanced `noxdev doctor` with new dependency checks:
+  - Checks for node:sqlite availability
+  - Verifies Claude Code CLI is in PATH
+- `noxdev setup` now auto-installs @anthropic-ai/claude-code and prompts for login if unauthenticated
+
+### Changed
+- **BREAKING**: Migrated from better-sqlite3 to native Node.js sqlite module
+  - All database operations now use `node:sqlite` instead of better-sqlite3
+  - Removed better-sqlite3 dependency and postinstall script
+  - Updated Node.js minimum requirement to 24.0.0 for native sqlite support
+- Complete codebase migration to native sqlite API across all modules:
+  - Database connection handling via new `openDb()` helper
+  - Updated CLI, dashboard API, and all database queries
+  - Migrated test files to use native sqlite
+
+### Removed
+- better-sqlite3 dependency and related postinstall script
+
 ## [1.2.0] - 2026-04-14
 
 ### Added
