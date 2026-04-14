@@ -30,7 +30,6 @@ const TASK_DEFAULTS = {
   exitCode: 0,
   authMode: "max",
   criticMode: "review",
-  pushMode: "auto",
   attempt: 1,
   devLogFile: null,
   criticLogFile: null,

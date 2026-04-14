@@ -7,7 +7,14 @@ import {
   insertTaskResult,
   insertTaskCache,
 } from "../../db/queries.js";
+
+// Mock the db module before importing logCommand
+vi.mock("../../db/index.js", () => ({
+  getDb: vi.fn(),
+}));
+
 import { logCommand } from "../log.js";
+import { getDb } from "../../db/index.js";
 
 function createDb(): InstanceType<typeof Database> {
   const db = new Database(":memory:");
@@ -31,7 +38,6 @@ const TASK_DEFAULTS = {
   exitCode: 0,
   authMode: "max",
   criticMode: "review",
-  pushMode: "auto",
   attempt: 1,
   devLogFile: null,
   criticLogFile: null,
@@ -63,9 +69,7 @@ describe("log command", () => {
     });
 
     // Mock getDb to return our test database
-    vi.doMock("../../db/index.js", () => ({
-      getDb: () => db,
-    }));
+    vi.mocked(getDb).mockReturnValue(db);
   });
 
   afterEach(() => {
@@ -192,12 +196,19 @@ describe("log command", () => {
   });
 
   it("shows usage help when no project provided and not in worktree", async () => {
+    // Mock process.cwd to return a directory without .noxdev config
+    const originalCwd = process.cwd;
+    vi.spyOn(process, "cwd").mockReturnValue("/tmp/no-noxdev-here");
+
     await logCommand();
 
     const output = logs.join("\n");
     expect(output).toContain("Usage: noxdev log <project> [task-id]");
     expect(output).toContain("noxdev log mit-nexus");
     expect(output).toContain("Run from inside a project worktree to infer");
+
+    // Restore original cwd
+    process.cwd = originalCwd;
   });
 
   it("exits with error for unknown project", async () => {
