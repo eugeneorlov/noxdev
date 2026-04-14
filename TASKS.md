@@ -60,7 +60,7 @@
   8. Delete the "shows pending merge count" test case on lines 128-173
 
 ## T3: Documentation cleanup
-- STATUS: pending
+- STATUS: done
 - FILES: IMPLEMENTATION_NOTES.md, packages/cli/README.md, README.md
 - VERIFY: cd packages/cli && pnpm build && [ ! -f IMPLEMENTATION_NOTES.md ] && ! grep -q "noxdev merge" packages/cli/README.md && ! grep -q "visual merge review workflow" README.md && grep -q "git merge noxdev" README.md
 - CRITIC: skip
