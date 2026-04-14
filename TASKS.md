@@ -186,7 +186,7 @@
   Import SessionUsage from './types'.
 
 ## T9: Wire cost capture into the run engine
-- STATUS: failed
+- STATUS: done
 - FILES: packages/cli/src/commands/run.ts, packages/cli/src/db/queries.ts
 - VERIFY: cd packages/cli && pnpm build && grep -q "parseSessionUsage" dist/commands/run.js && grep -q "computeCostUsd" dist/commands/run.js
 - CRITIC: review
@@ -214,7 +214,7 @@
   Do NOT change the container lifecycle, auth flow, or critic invocation. This is observation-only.
 
 ## T10: CLI surfaces — noxdev cost command + status/log integration
-- STATUS: failed
+- STATUS: done
 - FILES: packages/cli/src/commands/cost.ts, packages/cli/src/commands/status.ts, packages/cli/src/commands/log.ts, packages/cli/src/index.ts
 - VERIFY: cd packages/cli && pnpm build && node dist/index.js cost --help | grep -qi "tokens" && node dist/index.js cost --help | grep -qi "since"
 - CRITIC: review
@@ -263,7 +263,7 @@
     If cost_usd is NULL or 0 and model is NULL, print "Cost: no data captured".
 
 ## T11: Dashboard API — cost endpoints + task/run fields
-- STATUS: failed
+- STATUS: done
 - FILES: packages/dashboard/src/api/routes/cost.ts, packages/dashboard/src/api/routes/index.ts, packages/dashboard/src/api/routes/runs.ts, packages/dashboard/src/api/routes/tasks.ts
 - VERIFY: cd packages/dashboard && pnpm build && grep -q "/cost/summary" dist/api/routes/cost.mjs 2>/dev/null || grep -q "cost/summary" dist/api/routes/cost.js 2>/dev/null || grep -qr "cost/summary" dist/api/
 - CRITIC: review
@@ -290,7 +290,7 @@
   existing code tasks is inside runs.ts; check both).
 
 ## T12: Dashboard UI — Overview cost summary + TaskRow cost + TaskDetail cost section
-- STATUS: pending
+- STATUS: done
 - FILES: packages/dashboard/src/pages/Overview.tsx, packages/dashboard/src/components/TaskRow.tsx, packages/dashboard/src/pages/TaskDetail.tsx, packages/dashboard/src/components/CostSummary.tsx
 - VERIFY: cd packages/dashboard && pnpm build
 - CRITIC: skip
@@ -326,7 +326,7 @@
   /api/cost/projects endpoint.)
 
 ## T13: Update README and CHANGELOG
-- STATUS: pending
+- STATUS: done
 - FILES: README.md, CHANGELOG.md
 - VERIFY: grep -q "noxdev cost" README.md && grep -q "1.2.0" CHANGELOG.md && ! grep -q "noxdev merge" README.md
 - CRITIC: skip
@@ -364,7 +364,7 @@
     - `merge_decision` and `merged_at` columns from the task_results table (migrated on first run)
 
 ## T14: Version bump
-- STATUS: pending
+- STATUS: done
 - FILES: packages/cli/package.json, packages/dashboard/package.json
 - VERIFY: grep -q '"version": "1.2.0"' packages/cli/package.json && grep -q '"version": "1.2.0"' packages/dashboard/package.json
 - CRITIC: skip
