@@ -22,6 +22,8 @@ interface TaskResult {
   dev_log_file: string | null;
   critic_log_file: string | null;
   diff_file: string | null;
+  cost_usd: number | null;
+  auth_mode_cost: string | null;
 }
 
 interface TaskRowProps {
@@ -48,6 +50,29 @@ export function TaskRow({ task, runId }: TaskRowProps) {
   const truncateCommitSha = (sha: string | null): string => {
     if (!sha) return '—';
     return sha.substring(0, 7);
+  };
+
+  const formatCost = (cost: number | null, authModeValue: string | null): JSX.Element | null => {
+    if (!cost || cost === 0) return null;
+
+    if (authModeValue === 'api') {
+      return (
+        <span className="text-xs font-mono text-gray-600 dark:text-gray-400">
+          ${cost.toFixed(3)}
+        </span>
+      );
+    } else if (authModeValue === 'max') {
+      return (
+        <span
+          className="text-xs font-mono text-gray-500 dark:text-gray-500"
+          title="Max equivalent API cost"
+        >
+          ${cost.toFixed(3)}*
+        </span>
+      );
+    }
+
+    return null;
   };
 
 
@@ -81,6 +106,7 @@ export function TaskRow({ task, runId }: TaskRowProps) {
           <span className="text-sm text-gray-600 dark:text-gray-400 font-mono">
             {formatDuration(task.duration_seconds)}
           </span>
+          {formatCost(task.cost_usd, task.auth_mode_cost)}
           <span className="text-sm text-gray-600 dark:text-gray-400 font-mono">
             {truncateCommitSha(task.commit_sha)}
           </span>

@@ -26,6 +26,13 @@ interface TaskDetailData {
   files?: string;
   verify?: string;
   diff_content?: string;
+  cost_usd: number | null;
+  auth_mode_cost: string | null;
+  model: string | null;
+  input_tokens: number | null;
+  output_tokens: number | null;
+  cache_read_tokens: number | null;
+  cache_write_tokens: number | null;
 }
 
 export default function TaskDetail() {
@@ -65,6 +72,23 @@ export default function TaskDetail() {
       // If it's not JSON, treat it as a simple string
       return files.split(',').map(f => f.trim()).filter(Boolean);
     }
+  };
+
+  const formatTokens = (tokens: number | null): string => {
+    if (tokens === null || tokens === undefined) return '—';
+    return new Intl.NumberFormat('en-US').format(tokens);
+  };
+
+  const formatCostDisplay = (cost: number | null, authModeCost: string | null): string => {
+    if (!cost) return '—';
+
+    const formattedCost = `$${cost.toFixed(4)}`;
+    if (authModeCost === 'api') {
+      return `${formattedCost} (api)`;
+    } else if (authModeCost === 'max') {
+      return `${formattedCost} equivalent (max)`;
+    }
+    return formattedCost;
   };
 
 
@@ -179,6 +203,43 @@ export default function TaskDetail() {
                 <span className="font-mono">{truncateCommitSha(task.commit_sha)}</span>
               </div>
             </div>
+          </div>
+        </section>
+
+        {/* Cost */}
+        <section>
+          <h2 className="text-xl font-semibold mb-3">Cost</h2>
+          <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
+            {task.cost_usd !== null && task.model !== null ? (
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+                <div>
+                  <span className="text-gray-600 dark:text-gray-400 block">Model:</span>
+                  <span className="font-mono">{task.model}</span>
+                </div>
+                <div>
+                  <span className="text-gray-600 dark:text-gray-400 block">Input tokens:</span>
+                  <span className="font-mono">{formatTokens(task.input_tokens)}</span>
+                </div>
+                <div>
+                  <span className="text-gray-600 dark:text-gray-400 block">Output tokens:</span>
+                  <span className="font-mono">{formatTokens(task.output_tokens)}</span>
+                </div>
+                <div>
+                  <span className="text-gray-600 dark:text-gray-400 block">Cache read:</span>
+                  <span className="font-mono">{formatTokens(task.cache_read_tokens)}</span>
+                </div>
+                <div>
+                  <span className="text-gray-600 dark:text-gray-400 block">Cache write:</span>
+                  <span className="font-mono">{formatTokens(task.cache_write_tokens)}</span>
+                </div>
+                <div>
+                  <span className="text-gray-600 dark:text-gray-400 block">Cost:</span>
+                  <span className="font-mono">{formatCostDisplay(task.cost_usd, task.auth_mode_cost)}</span>
+                </div>
+              </div>
+            ) : (
+              <p className="text-gray-600 dark:text-gray-400">No cost data captured for this task.</p>
+            )}
           </div>
         </section>
 

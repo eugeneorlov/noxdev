@@ -1,5 +1,6 @@
 import { useApi } from '../hooks/useApi';
 import { RunCard } from '../components/RunCard';
+import { CostSummary } from '../components/CostSummary';
 
 interface Project {
   id: string;
@@ -15,6 +16,7 @@ interface Project {
 
 export default function Overview() {
   const { data: projects, loading, error } = useApi<Project[]>('/api/projects');
+  const { data: costSummary, loading: costLoading } = useApi('/api/cost/summary');
 
   const getCurrentDate = (): string => {
     return new Date().toLocaleDateString('en-US', {
@@ -67,6 +69,8 @@ export default function Overview() {
 
   return (
     <div className="p-6">
+      <CostSummary summary={costSummary} loading={costLoading} />
+
       <header className="mb-8">
         <h1 className="text-3xl font-bold mb-2 text-gray-900 dark:text-gray-100">Good morning</h1>
         <p className="text-gray-600 dark:text-gray-400 mb-4">{getCurrentDate()}</p>
