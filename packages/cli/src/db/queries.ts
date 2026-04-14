@@ -107,22 +107,14 @@ export function insertTaskResult(
     costUsd?: number;
   },
 ): void {
-  // Determine merge decision based on push mode and status
-  const mergeDecision = (result.pushMode === 'auto' && (result.status === 'COMPLETED' || result.status === 'COMPLETED_RETRY'))
-    ? 'approved'
-    : 'pending';
-
-  // Set merged_at for auto-approved tasks
-  const mergedAt = mergeDecision === 'approved' ? new Date().toISOString() : null;
-
   db.prepare(
     `INSERT INTO task_results
      (run_id, task_id, title, status, exit_code, auth_mode, critic_mode, push_mode,
       attempt, commit_sha, started_at, finished_at, duration_seconds,
-      dev_log_file, critic_log_file, diff_file, merge_decision, merged_at,
+      dev_log_file, critic_log_file, diff_file,
       input_tokens, output_tokens, cache_read_tokens, cache_write_tokens,
       model, auth_mode_cost, cost_usd)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     result.runId,
     result.taskId,
@@ -140,8 +132,6 @@ export function insertTaskResult(
     result.devLogFile,
     result.criticLogFile,
     result.diffFile,
-    mergeDecision,
-    mergedAt,
     result.inputTokens ?? null,
     result.outputTokens ?? null,
     result.cacheReadTokens ?? null,
@@ -150,17 +140,6 @@ export function insertTaskResult(
     result.authModeCost ?? null,
     result.costUsd ?? null,
   );
-}
-
-export function updateMergeDecision(
-  db: Database.Database,
-  taskResultId: number,
-  decision: string,
-  mergedAt?: string,
-): void {
-  db.prepare(
-    `UPDATE task_results SET merge_decision = LOWER(?), merged_at = ? WHERE id = ?`,
-  ).run(decision, mergedAt ?? null, taskResultId);
 }
 
 export function getLatestRun(db: Database.Database, projectId: string) {
@@ -173,12 +152,6 @@ export function getLatestRun(db: Database.Database, projectId: string) {
 
 export function getTaskResults(db: Database.Database, runId: string) {
   return db.prepare(`SELECT * FROM task_results WHERE run_id = ?`).all(runId);
-}
-
-export function getPendingMerge(db: Database.Database, runId: string) {
-  return db
-    .prepare(`SELECT * FROM task_results WHERE run_id = ? AND LOWER(merge_decision) = 'pending'`)
-    .all(runId);
 }
 
 export function getProject(db: Database.Database, projectId: string) {

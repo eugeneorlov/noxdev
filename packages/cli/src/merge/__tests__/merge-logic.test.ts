@@ -116,19 +116,16 @@ describe("getMergeCandidates", () => {
     expect(candidates[1].status).toBe("completed_retry");
   });
 
-  it("returns empty array when no pending tasks", () => {
-    // Insert a task that's already approved
+  it("returns empty array when no completed tasks with commits", () => {
+    // Insert a failed task — should not be returned
     insertTaskResult(db, {
       ...TASK_DEFAULTS,
       runId: "run-1",
       taskId: "T1",
       title: "Task One",
-      status: "completed",
+      status: "failed",
       commitSha: "aaa111",
     });
-
-    // Mark as approved
-    db.prepare(`UPDATE task_results SET merge_decision = LOWER('approved') WHERE task_id = 'T1'`).run();
 
     const candidates = getMergeCandidates(db, "proj-1");
     expect(candidates).toHaveLength(0);
@@ -230,16 +227,6 @@ describe("applyMergeDecisions", () => {
     expect(result.rejected).toBe(0);
     expect(result.skipped).toBe(0);
 
-    // Check SQLite updated
-    const updated = db.prepare(`SELECT merge_decision, merged_at FROM task_results`).all() as Array<{
-      merge_decision: string;
-      merged_at: string | null;
-    }>;
-    for (const row of updated) {
-      expect(row.merge_decision).toBe("approved");
-      expect(row.merged_at).not.toBeNull();
-    }
-
     // Check git merge was called
     expect(mockExecSync).toHaveBeenCalledWith(
       expect.stringContaining("git merge noxdev/proj-1"),
@@ -290,27 +277,6 @@ describe("applyMergeDecisions", () => {
     expect(result.rejected).toBe(1);
     expect(result.skipped).toBe(1);
 
-    // Check SQLite state
-    const updated = db
-      .prepare(`SELECT task_id, merge_decision, merged_at FROM task_results ORDER BY id`)
-      .all() as Array<{
-      task_id: string;
-      merge_decision: string;
-      merged_at: string | null;
-    }>;
-
-    // T1 approved
-    expect(updated[0].merge_decision).toBe("approved");
-    expect(updated[0].merged_at).not.toBeNull();
-
-    // T2 rejected
-    expect(updated[1].merge_decision).toBe("rejected");
-    expect(updated[1].merged_at).not.toBeNull();
-
-    // T3 skipped — still pending
-    expect(updated[2].merge_decision).toBe("pending");
-    expect(updated[2].merged_at).toBeNull();
-
     // Check git revert was called for T2
     expect(mockExecSync).toHaveBeenCalledWith(
       "git revert --no-commit bbb222",
@@ -352,14 +318,6 @@ describe("applyMergeDecisions", () => {
     expect(result.merged).toBe(0);
     expect(result.rejected).toBe(0);
     expect(result.skipped).toBe(1);
-
-    // SQLite still pending
-    const updated = db.prepare(`SELECT merge_decision, merged_at FROM task_results`).all() as Array<{
-      merge_decision: string;
-      merged_at: string | null;
-    }>;
-    expect(updated[0].merge_decision).toBe("pending");
-    expect(updated[0].merged_at).toBeNull();
 
     // No git merge called (only the branch name lookup may be called)
     const mergeCalls = mockExecSync.mock.calls.filter(

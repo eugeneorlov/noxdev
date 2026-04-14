@@ -3,3 +3,4 @@ dist
 *.db
 .turbo
 .pnpm-store
+.audits/

@@ -125,54 +125,6 @@ describe("status command", () => {
     expect(output).toContain("noxdev run proj-1");
   });
 
-  it("shows pending merge count", () => {
-    insertRun(db, {
-      id: "run-1",
-      projectId: "proj-1",
-      startedAt: "2026-03-23T10:00:00",
-      authMode: "max",
-      totalTasks: 2,
-      commitBefore: "abc123",
-      logFile: "/tmp/run.log",
-    });
-    updateRunFinished(db, "run-1", {
-      finishedAt: "2026-03-23T11:00:00",
-      completed: 2,
-      failed: 0,
-      skipped: 0,
-      status: "finished",
-      commitAfter: "def456",
-    });
-    insertTaskResult(db, {
-      ...TASK_DEFAULTS,
-      runId: "run-1",
-      taskId: "T1",
-      title: "Task one",
-      status: "completed",
-      commitSha: "sha1",
-      startedAt: "2026-03-23T10:01:00",
-      finishedAt: "2026-03-23T10:05:00",
-      durationSeconds: 240,
-    });
-    insertTaskResult(db, {
-      ...TASK_DEFAULTS,
-      runId: "run-1",
-      taskId: "T2",
-      title: "Task two",
-      status: "completed",
-      commitSha: "sha2",
-      startedAt: "2026-03-23T10:05:00",
-      finishedAt: "2026-03-23T10:10:00",
-      durationSeconds: 300,
-    });
-
-    showProjectStatus(db, "proj-1");
-
-    const output = logs.join("\n");
-    expect(output).toContain("Pending merge: 2 tasks awaiting review");
-    expect(output).toContain("noxdev merge proj-1");
-  });
-
   it("shows 'in progress' for running run", () => {
     insertRun(db, {
       id: "run-1",

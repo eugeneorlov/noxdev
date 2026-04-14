@@ -1,6 +1,6 @@
 import type Database from "better-sqlite3";
 import { execSync } from "node:child_process";
-import { getLatestRun, updateMergeDecision } from "../db/queries.js";
+import { getLatestRun } from "../db/queries.js";
 
 export interface MergeCandidate {
   taskResultId: number;
@@ -24,7 +24,6 @@ interface TaskResultRow {
   status: string;
   commit_sha: string | null;
   diff_file: string | null;
-  merge_decision: string;
 }
 
 interface RunRow {
@@ -44,7 +43,6 @@ export function getMergeCandidates(
        FROM task_results
        WHERE run_id = ?
          AND UPPER(status) IN ('COMPLETED', 'COMPLETED_RETRY')
-         AND LOWER(merge_decision) = 'pending'
          AND commit_sha IS NOT NULL`,
     )
     .all(run.id) as TaskResultRow[];
@@ -72,7 +70,7 @@ export function getAutoApprovedTasks(
        FROM task_results
        WHERE run_id = ?
          AND UPPER(status) IN ('COMPLETED', 'COMPLETED_RETRY')
-         AND LOWER(merge_decision) = 'approved'
+         AND LOWER(push_mode) = 'auto'
          AND commit_sha IS NOT NULL`,
     )
     .all(run.id) as TaskResultRow[];
@@ -107,7 +105,6 @@ export function applyMergeDecisions(
   projectGitDir: string,
   decisions: MergeDecision[],
 ): { merged: number; rejected: number; skipped: number } {
-  const now = new Date().toISOString();
   let merged = 0;
   let rejected = 0;
   let skipped = 0;
@@ -127,13 +124,10 @@ export function applyMergeDecisions(
           { cwd: worktreeDir },
         );
       }
-      updateMergeDecision(db, d.taskResultId, "rejected", now);
       rejected++;
     } else if (d.decision === "approved") {
-      updateMergeDecision(db, d.taskResultId, "approved", now);
       merged++;
     } else {
-      // skipped — leave merge_decision as pending
       skipped++;
     }
   }
