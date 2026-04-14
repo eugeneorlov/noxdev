@@ -139,17 +139,6 @@ export function insertTaskResult(
   );
 }
 
-export function updateMergeDecision(
-  db: Database.Database,
-  taskResultId: number,
-  decision: string,
-  mergedAt?: string,
-): void {
-  db.prepare(
-    `UPDATE task_results SET merge_decision = LOWER(?), merged_at = ? WHERE id = ?`,
-  ).run(decision, mergedAt ?? null, taskResultId);
-}
-
 export function getLatestRun(db: Database.Database, projectId: string) {
   return (
     db
@@ -160,12 +149,6 @@ export function getLatestRun(db: Database.Database, projectId: string) {
 
 export function getTaskResults(db: Database.Database, runId: string) {
   return db.prepare(`SELECT * FROM task_results WHERE run_id = ?`).all(runId);
-}
-
-export function getPendingMerge(db: Database.Database, runId: string) {
-  return db
-    .prepare(`SELECT * FROM task_results WHERE run_id = ? AND LOWER(merge_decision) = 'pending'`)
-    .all(runId);
 }
 
 export function getProject(db: Database.Database, projectId: string) {

@@ -5,7 +5,6 @@ import { getDb } from "../db/index.js";
 import {
   getLatestRun,
   getTaskResults,
-  getPendingMerge,
   getProject,
   getAllProjects,
 } from "../db/queries.js";
@@ -162,13 +161,6 @@ export function showProjectStatus(db: Database.Database, projectId: string): voi
       const dur = t.duration_seconds != null ? `${t.duration_seconds}s` : "";
       console.log(`  ${t.task_id}: ${t.title}  ${badge}  ${sha}  ${dur}`);
     }
-  }
-
-  const pending = getPendingMerge(db, run.id);
-  if (pending.length > 0) {
-    console.log("");
-    console.log(`Pending merge: ${pending.length} tasks awaiting review`);
-    console.log(`Next step: noxdev merge ${projectId}`);
   }
 }
 

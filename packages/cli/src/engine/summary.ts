@@ -1,6 +1,6 @@
 import type Database from "better-sqlite3";
 import chalk from "chalk";
-import { getAllProjects, getLatestRun, getTaskResults, getPendingMerge } from "../db/queries.js";
+import { getAllProjects, getLatestRun, getTaskResults } from "../db/queries.js";
 
 export interface ProjectSummary {
   projectId: string;
@@ -11,7 +11,6 @@ export interface ProjectSummary {
   completed: number;
   failed: number;
   skipped: number;
-  pendingMerge: number;
   startedAt: string | null;
   finishedAt: string | null;
 }
@@ -49,14 +48,11 @@ export function getAllProjectSummaries(db: Database.Database): ProjectSummary[] 
         completed: 0,
         failed: 0,
         skipped: 0,
-        pendingMerge: 0,
         startedAt: null,
         finishedAt: null,
       });
       continue;
     }
-
-    const pending = getPendingMerge(db, run.id);
 
     summaries.push({
       projectId: p.id,
@@ -67,7 +63,6 @@ export function getAllProjectSummaries(db: Database.Database): ProjectSummary[] 
       completed: run.completed ?? 0,
       failed: run.failed ?? 0,
       skipped: run.skipped ?? 0,
-      pendingMerge: pending.length,
       startedAt: run.started_at,
       finishedAt: run.finished_at,
     });
@@ -97,14 +92,14 @@ function pad(str: string, len: number): string {
 
 export function formatSummaryTable(summaries: ProjectSummary[]): string {
   const header =
-    `${pad("PROJECT", 21)}${pad("LAST RUN", 13)}${pad("STATUS", 14)}${pad("TASKS", 14)}MERGE`;
+    `${pad("PROJECT", 21)}${pad("LAST RUN", 13)}${pad("STATUS", 14)}TASKS`;
 
   const lines: string[] = [chalk.bold(header)];
 
   for (const s of summaries) {
     if (!s.runId || !s.startedAt) {
       const line =
-        `${pad(s.projectId, 21)}${pad("never", 13)}${pad("\u2014", 14)}${pad("\u2014", 14)}\u2014`;
+        `${pad(s.projectId, 21)}${pad("never", 13)}${pad("\u2014", 14)}\u2014`;
       lines.push(chalk.dim(line));
       continue;
     }
@@ -121,10 +116,8 @@ export function formatSummaryTable(summaries: ProjectSummary[]): string {
       tasksStr = `${s.completed}/${s.total}`;
     }
 
-    const mergeStr = s.pendingMerge > 0 ? `${s.pendingMerge} pending` : "\u2014";
-
     const raw =
-      `${pad(s.projectId, 21)}${pad(timeStr, 13)}${pad(statusStr, 14)}${pad(tasksStr, 14)}${mergeStr}`;
+      `${pad(s.projectId, 21)}${pad(timeStr, 13)}${pad(statusStr, 14)}${tasksStr}`;
 
     if (s.failed > 0) {
       lines.push(chalk.yellow(raw));
