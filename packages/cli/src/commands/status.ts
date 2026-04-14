@@ -162,6 +162,7 @@ export function showProjectStatus(db: Database.Database, projectId: string): voi
       console.log(`  ${t.task_id}: ${t.title}  ${badge}  ${sha}  ${dur}`);
     }
   }
+
 }
 
 function isRecentRun(startedAt: string): boolean {
