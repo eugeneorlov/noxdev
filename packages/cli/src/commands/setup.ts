@@ -93,13 +93,68 @@ async function runSetup(opts: SetupOptions = {}): Promise<void> {
     process.exit(1);
   }
 
-  // 5. Claude Code CLI check
+  // 5. Claude Code CLI check and auto-install
+  let claudeInstalled = false;
   try {
     execSync('claude --version', { stdio: 'pipe' });
-    console.log(chalk.green('✓ Claude Code CLI installed'));
+    claudeInstalled = true;
+    console.log(chalk.green('✓ Claude Code CLI already installed'));
   } catch {
-    console.error(chalk.red('✖ Claude Code CLI not found. Install with: npm install -g @anthropic-ai/claude-code'));
-    process.exit(1);
+    console.log(chalk.cyan('Installing @anthropic-ai/claude-code globally...'));
+    try {
+      execSync('npm install -g @anthropic-ai/claude-code', { stdio: 'inherit' });
+      claudeInstalled = true;
+      console.log(chalk.green('✓ Claude Code CLI installed successfully'));
+    } catch (installError) {
+      console.error(chalk.red('✖ Failed to install @anthropic-ai/claude-code globally'));
+      console.error(chalk.gray(`  Error: ${installError instanceof Error ? installError.message : String(installError)}`));
+      console.error(chalk.gray('  Please try manually: npm install -g @anthropic-ai/claude-code'));
+      process.exit(1);
+    }
+  }
+
+  // 6. Claude Code authentication check
+  if (claudeInstalled) {
+    try {
+      const authResult = execSync('claude auth status', { stdio: 'pipe', encoding: 'utf8' });
+      const authData = JSON.parse(authResult);
+
+      if (authData.loggedIn) {
+        console.log(chalk.green(`✓ Claude Code authenticated (${authData.email || 'user'})`));
+      } else {
+        console.log(chalk.yellow('\n⚠ Claude Code CLI is not authenticated'));
+        console.log('To use Claude Code CLI, you need to authenticate with your Anthropic account.');
+
+        const rl = createInterface({
+          input: process.stdin,
+          output: process.stdout
+        });
+
+        const answer = await new Promise<string>((resolve) => {
+          rl.question('Would you like to authenticate now? [Y/n] ', (answer) => {
+            rl.close();
+            resolve(answer);
+          });
+        });
+
+        if (answer.toLowerCase() !== 'n') {
+          console.log(chalk.cyan('\nOpening authentication flow...\n'));
+          try {
+            execSync('claude auth login', { stdio: 'inherit' });
+            console.log(chalk.green('\n✓ Authentication completed'));
+          } catch (authError) {
+            console.error(chalk.yellow('\n⚠ Authentication failed or was cancelled'));
+            console.error(chalk.gray('  You can authenticate later with: claude auth login'));
+          }
+        } else {
+          console.log(chalk.gray('  You can authenticate later with: claude auth login'));
+        }
+      }
+    } catch (statusError) {
+      console.error(chalk.yellow('⚠ Could not check Claude Code authentication status'));
+      console.error(chalk.gray(`  Error: ${statusError instanceof Error ? statusError.message : String(statusError)}`));
+      console.error(chalk.gray('  You can check manually with: claude auth status'));
+    }
   }
 
   // STEP B: Confirmation prompt (skip if --yes)
