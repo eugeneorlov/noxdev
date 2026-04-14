@@ -1,12 +1,12 @@
 import path from 'node:path';
 import os from 'node:os';
-import Database from 'better-sqlite3';
+import { openDb, type Database } from '../../../cli/src/db/connection.js';
 
-export function getDb(): Database.Database {
+export function getDb(): Database {
   const dbPath = path.join(os.homedir(), '.noxdev', 'ledger.db');
 
-  return new Database(dbPath, {
+  return openDb(dbPath, {
     readonly: false,
-    fileMustExist: false
+    runMigrations: true
   });
 }
