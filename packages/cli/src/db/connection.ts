@@ -1,7 +1,12 @@
-import Database from "better-sqlite3";
+import { DatabaseSync } from "node:sqlite";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { migrate } from "./migrate.js";
+
+export interface OpenDbOptions {
+  readonly?: boolean;
+  runMigrations?: boolean;
+}
 
 /**
  * Opens a database connection with proper configuration.
@@ -13,9 +18,9 @@ import { migrate } from "./migrate.js";
  */
 export function openDb(
   dbPath: string,
-  options: { runMigrations?: boolean } = {}
-): Database.Database {
-  const { runMigrations = true } = options;
+  options: OpenDbOptions = {}
+): DatabaseSync {
+  const { readonly = false, runMigrations = true } = options;
 
   // Create directory for file-based databases (skip for in-memory)
   if (dbPath !== ':memory:') {
@@ -24,11 +29,16 @@ export function openDb(
   }
 
   // Create database instance
-  const db = new Database(dbPath);
+  const db = new DatabaseSync(dbPath, {
+    readOnly: readonly,
+  });
 
-  // Configure database settings
-  db.pragma("journal_mode = WAL");
-  db.pragma("foreign_keys = ON");
+  // Enable WAL mode for concurrent CLI + dashboard reads.
+  // Skip for in-memory and read-only handles.
+  if (dbPath !== ":memory:" && !readonly) {
+    db.exec("PRAGMA journal_mode = WAL");
+    db.exec("PRAGMA foreign_keys = ON");
+  }
 
   // Run migrations if requested and not in-memory
   if (runMigrations && dbPath !== ':memory:') {
@@ -37,3 +47,6 @@ export function openDb(
 
   return db;
 }
+
+// Re-export DatabaseSync as Database for ergonomic imports across the codebase.
+export type Database = DatabaseSync;

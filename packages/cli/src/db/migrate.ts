@@ -1,4 +1,4 @@
-import type Database from "better-sqlite3";
+import type { Database } from "./connection.js";
 
 // Schema is inlined for compatibility with tsup bundling.
 // Canonical schema definition lives in schema.sql.
@@ -80,7 +80,7 @@ CREATE TABLE IF NOT EXISTS tasks (
 );
 `;
 
-export function migrate(db: Database.Database): void {
+export function migrate(db: Database): void {
   // First, ensure basic tables exist for new installations
   db.exec(`
     CREATE TABLE IF NOT EXISTS projects (
