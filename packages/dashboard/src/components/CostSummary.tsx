@@ -55,8 +55,7 @@ export function CostSummary({ summary, loading }: CostSummaryProps) {
   }
 
   const totalCost = summary.api.cost_usd + summary.max.cost_usd_equivalent;
-  const totalTokens = summary.tokens.input + summary.tokens.output +
-                      summary.tokens.cache_read + summary.tokens.cache_write;
+  const totalTokens = summary.tokens.input + summary.tokens.output;
 
   return (
     <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-4 mb-6">
