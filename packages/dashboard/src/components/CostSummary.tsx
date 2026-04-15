@@ -69,7 +69,7 @@ export function CostSummary({ summary, loading }: CostSummaryProps) {
             {formatCost(summary.api.cost_usd, 'currency')}
           </div>
           <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-            API Cost
+            Cost
           </div>
           <div className="text-xs text-gray-500 dark:text-gray-500 mt-1">
             {summary.api.tasks} tasks
@@ -81,7 +81,7 @@ export function CostSummary({ summary, loading }: CostSummaryProps) {
             {formatCost(summary.max.cost_usd_equivalent, 'currency')}
           </div>
           <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-            Max Equivalent Cost
+            Cost
           </div>
           <div className="text-xs text-gray-500 dark:text-gray-500 mt-1">
             {summary.max.tasks} tasks
@@ -96,7 +96,7 @@ export function CostSummary({ summary, loading }: CostSummaryProps) {
             Total
           </div>
           <div className="text-xs text-gray-500 dark:text-gray-500 mt-1">
-            API + Max equivalent
+            Token-based cost
           </div>
         </div>
 

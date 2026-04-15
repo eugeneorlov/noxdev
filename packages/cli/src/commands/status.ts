@@ -146,7 +146,7 @@ export function showProjectStatus(db: Database.Database, projectId: string): voi
     const maxCostStr = formatCost(costData.max_cost);
     const inputStr = formatTokens(costData.input_tokens);
     const outputStr = formatTokens(costData.output_tokens);
-    console.log(`Cost: ${apiCostStr} API + ${maxCostStr} Max-equiv  ·  ${inputStr} input / ${outputStr} output tokens`);
+    console.log(`Cost: ${formatCost((costData.api_cost || 0) + (costData.max_cost || 0))}  ·  ${inputStr} input / ${outputStr} output tokens`);
   }
 
   if (tasks.length > 0) {
