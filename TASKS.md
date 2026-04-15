@@ -1,434 +1,385 @@
-# v1.3.0 — no native deps, install UX fixes
+# v1.3.2 — honest doctor, working dashboard, working cost tracking
 
-# Theme: Eliminate native dependencies. Fix install UX end-to-end.
-# Breaking: Node minimum bumps to 24 (stable node:sqlite, no flag).
-# Dependencies: clean main, v1.2.0 published
-# Gate: pnpm build && pnpm test pass; fresh `pnpm add -g @eugene218/noxdev` on Mac
-#       proceeds to working state without any manual rebuilds or installs.
-# Related: .audits/audit-install-ux-2026-04-14.md
-# Out of scope: Windows native (use WSL2), credential validity check (claude login is manual)
+# Scope: Three audit-driven fix bundles plus README + version cuts.
+#   1. Doctor: stop lying about Docker fallbacks for host-side tools
+#   2. Demo: validate host prereqs at start instead of mid-scaffold crash
+#   3. Dashboard: fix tsup node: prefix strip (same root cause as v1.3.1 CLI fix)
+#   4. Cost tracking: fix path encoding mismatch + missing API-mode volume mount
+#   5. README: list uv as required
+#   6. CHANGELOG + version bump
+#
+# Source audits (read these into Project before planning the next round):
+#   .audits/audit-doctor-reassurances-2026-04-15.md
+#   .audits/audit-cost-tracking-2026-04-15.md
+#
+# Dependencies: clean main at v1.3.1
+# Gate: pnpm build && pnpm test pass; doctor honest; demo fails-fast on missing prereq;
+#       noxdev dashboard runs without ERR_MODULE_NOT_FOUND; noxdev cost shows real data
+#       after at least one new run completes.
+#
+# CRITIC: skip on all tasks. Verification done via post-run audit comparing actual diffs
+# against this TASKS.md, not via critic agent (per recurring critic-reliability issue).
 
-## T1: Add openDb() helper as the canonical DB entry point
-- STATUS: failed
-- FILES: packages/cli/src/db/connection.ts
-- VERIFY: cd packages/cli && pnpm build && node -e "import('./dist/db/connection.js').then(m => { const db = m.openDb(':memory:'); db.exec('CREATE TABLE t(x INTEGER)'); console.log('openDb works'); db.close(); })"
-- CRITIC: review
-- SPEC:
-  Create new file packages/cli/src/db/connection.ts that wraps node:sqlite's DatabaseSync
-  as the single canonical way noxdev opens a SQLite database. Nothing imports this yet —
-  this task only adds the helper.
-
-  Implementation:
-```ts
-  import { DatabaseSync } from "node:sqlite";
-
-  export interface OpenDbOptions {
-    readonly?: boolean;
-  }
-
-  export function openDb(path: string, options: OpenDbOptions = {}): DatabaseSync {
-    const db = new DatabaseSync(path, {
-      readOnly: options.readonly ?? false,
-    });
-
-    // Enable WAL mode for concurrent CLI + dashboard reads.
-    // Skip for in-memory and read-only handles.
-    if (path !== ":memory:" && !options.readonly) {
-      db.exec("PRAGMA journal_mode = WAL");
-      db.exec("PRAGMA foreign_keys = ON");
-    }
-
-    return db;
-  }
-
-  // Re-export DatabaseSync as Database for ergonomic imports across the codebase.
-  export type Database = DatabaseSync;
-```
-
-  Notes:
-  - node:sqlite uses `DatabaseSync` (synchronous) — matches better-sqlite3's sync API.
-  - Pragmas use `.exec()` not a `.pragma()` method (API difference from better-sqlite3).
-  - The `Database` type re-export means callers can do `import type { Database } from "../db/connection.js"`
-    and migrations from better-sqlite3 type usage become a one-line import swap.
-
-  Do NOT:
-  - Import this from anywhere yet (T2-T5 do that).
-  - Add any query logic here — this is connection only.
-  - Import from "better-sqlite3" anywhere in this file.
-
-## T2: Migrate db/index.ts to node:sqlite via openDb()
-- STATUS: done
-- FILES: packages/cli/src/db/index.ts
-- VERIFY: cd packages/cli && pnpm build && ! grep -q "better-sqlite3" src/db/index.ts
-- CRITIC: review
-- SPEC:
-  Replace the better-sqlite3 import and instantiation in packages/cli/src/db/index.ts
-  with the openDb() helper from T1.
-
-  1. Remove: `import Database from "better-sqlite3"`
-  2. Add:    `import { openDb, type Database } from "./connection.js"`
-  3. Replace any `new Database(path, opts)` calls with `openDb(path, opts)`.
-  4. Update any type annotations that reference the better-sqlite3 Database type to use
-     the re-exported Database type from connection.ts.
-  5. If db/index.ts has its own pragma calls (PRAGMA journal_mode, etc.), REMOVE them —
-     openDb() handles pragmas centrally now.
-
-  Do NOT touch query logic, just the connection setup.
-
-## T3: Migrate db/queries.ts and db/migrate.ts to node:sqlite API
-- STATUS: failed
-- FILES: packages/cli/src/db/queries.ts, packages/cli/src/db/migrate.ts
-- VERIFY: cd packages/cli && pnpm build && pnpm test --run src/db && ! grep -rn "better-sqlite3" src/db/
-- CRITIC: review
-- SPEC:
-  Migrate query and migration code from better-sqlite3 to node:sqlite. The APIs are similar
-  but not identical — handle each known difference explicitly.
-
-  In both packages/cli/src/db/queries.ts and packages/cli/src/db/migrate.ts:
-
-  1. Replace import statements:
-     - Remove: `import Database from "better-sqlite3"` (or `import type Database`)
-     - Add:    `import type { Database } from "./connection.js"`
-
-  2. Method-by-method migration. For each better-sqlite3 call, the node:sqlite equivalent:
-
-     | better-sqlite3                              | node:sqlite                                |
-     |---------------------------------------------|--------------------------------------------|
-     | `db.prepare(sql).run(...params)`            | `db.prepare(sql).run(...params)` (same)    |
-     | `db.prepare(sql).all(...params)`            | `db.prepare(sql).all(...params)` (same)    |
-     | `db.prepare(sql).get(...params)`            | `db.prepare(sql).get(...params)` (same)    |
-     | `db.prepare(sql).iterate(...)`              | `db.prepare(sql).iterate(...)` (same)      |
-     | `db.exec(sql)`                              | `db.exec(sql)` (same)                      |
-     | `db.pragma("foo = bar")`                    | `db.exec("PRAGMA foo = bar")`              |
-     | `db.transaction((args) => {...})`           | Manual: `db.exec("BEGIN")`, then logic,    |
-     |                                             | then `db.exec("COMMIT")` or `db.exec("ROLLBACK")` |
-     | `.run()` returns `{ changes, lastInsertRowid }` | Same shape — works                     |
-
-  3. Transaction handling — IMPORTANT API difference:
-     better-sqlite3 has `db.transaction(fn)` which returns a callable. node:sqlite does NOT
-     have this helper. Replace each transaction block with explicit BEGIN/COMMIT/ROLLBACK:
-
-```ts
-     // BEFORE (better-sqlite3):
-     const insertMany = db.transaction((rows) => {
-       for (const r of rows) insertStmt.run(r.id, r.name);
-     });
-     insertMany(rows);
-
-     // AFTER (node:sqlite):
-     function insertMany(rows) {
-       db.exec("BEGIN");
-       try {
-         for (const r of rows) insertStmt.run(r.id, r.name);
-         db.exec("COMMIT");
-       } catch (err) {
-         db.exec("ROLLBACK");
-         throw err;
-       }
-     }
-     insertMany(rows);
-```
-
-  4. Pragma calls in migrate.ts: replace `.pragma(...)` with `.exec("PRAGMA ...")`.
-
-  5. The lastInsertRowid type from node:sqlite is `number | bigint`. Most code expects
-     number — wrap with `Number()` if necessary at usage sites.
-
-  6. The `BindValue` type from node:sqlite restricts what can be passed as parameters
-     (string | number | bigint | Buffer | null). If queries.ts passes anything else
-     (e.g., booleans), convert to int (0/1) at the call site.
-
-  Do NOT modify the SQL itself, table schemas, or business logic. This is API translation only.
-
-## T4: Migrate dashboard/api/db.ts to openDb()
-- STATUS: failed
-- FILES: packages/dashboard/src/api/db.ts
-- VERIFY: cd packages/dashboard && pnpm build && ! grep -q "better-sqlite3" src/api/db.ts
-- CRITIC: review
-- SPEC:
-  Dashboard uses a read-only DB handle to display ledger data. Migrate to openDb().
-
-  In packages/dashboard/src/api/db.ts:
-  1. Remove: `import Database from "better-sqlite3"`
-  2. Add:    `import { openDb, type Database } from "../../../cli/src/db/connection.js"`
-     (Adjust the relative path to wherever connection.ts lives — verify it resolves.)
-  3. Replace `new Database(path, { readonly: true })` with `openDb(path, { readonly: true })`.
-  4. Update any type annotations using the better-sqlite3 Database type.
-
-  If the relative cross-package import is awkward, the alternative is to copy openDb() into
-  dashboard's own connection.ts. Prefer the import to avoid drift, but use copy if Turborepo
-  build complains about cross-package source imports.
-
-## T5: Migrate test files to node:sqlite
-- STATUS: done
-- FILES: packages/cli/src/db/__tests__/queries.test.ts, packages/cli/src/commands/__tests__/log.test.ts, packages/cli/src/commands/__tests__/run-multi.test.ts, packages/cli/src/commands/__tests__/status.test.ts
-- VERIFY: cd packages/cli && pnpm test --run && ! grep -rn "better-sqlite3" src/
-- CRITIC: review
-- SPEC:
-  Migrate the four test files that import better-sqlite3 directly to use openDb() with
-  in-memory databases.
-
-  For each file:
-  1. Remove: `import Database from "better-sqlite3"`
-  2. Add:    `import { openDb } from "../../db/connection.js"` (adjust relative path per file)
-  3. Replace `new Database(":memory:")` with `openDb(":memory:")`.
-  4. Apply the same API translations as T3 if any test exercises:
-     - .pragma() calls → .exec("PRAGMA ...")
-     - .transaction() → BEGIN/COMMIT/ROLLBACK
-     - .lastInsertRowid usage → Number(...) wrap if needed
-
-  Tests should pass without changes to assertions. If any assertion fails due to a real
-  semantic difference (e.g. lastInsertRowid type), update the assertion to match node:sqlite
-  behavior — do not paper over genuine bugs.
-
-  Do NOT investigate or modify the in-memory test masking concern noted in earlier audits.
-  If tests pass, move on. If they fail, fix the test honestly.
-
-## T6: Drop better-sqlite3 dependency, kill postinstall, bump Node minimum to 24
-- STATUS: failed
-- FILES: packages/cli/package.json, packages/dashboard/package.json, package.json, packages/cli/scripts/check-native.js
-- VERIFY: cd packages/cli && pnpm install && pnpm build && pnpm test && ! grep -q "better-sqlite3" package.json && ! grep -q "check-native" package.json && [ ! -f scripts/check-native.js ]
-- CRITIC: review
-- SPEC:
-  Remove all traces of better-sqlite3 and the postinstall machinery built around it.
-
-  1. packages/cli/package.json:
-     - Remove "better-sqlite3" from dependencies
-     - Remove the "postinstall": "node scripts/check-native.js" script
-     - Update "engines": { "node": ">=24" } (was 18 or 20)
-
-  2. packages/dashboard/package.json:
-     - Remove "better-sqlite3" from dependencies
-     - Update "engines": { "node": ">=24" }
-
-  3. Root package.json:
-     - Remove the "pnpm": { "onlyBuiltDependencies": [...] } block entirely if better-sqlite3
-       was the only entry. If esbuild is still listed, keep the block with just esbuild.
-     - Update root "engines": { "node": ">=24" }
-
-  4. Delete the file packages/cli/scripts/check-native.js entirely.
-
-  5. After all changes, run `pnpm install` to update pnpm-lock.yaml. Commit the lockfile.
-
-  Do NOT:
-  - Touch any other dependencies.
-  - Modify Dockerfile (Docker image runs Node 22 internally for now — that's fine, the
-    constraint is on the user's host machine, not the container).
-
-## T7: noxdev setup auto-installs @anthropic-ai/claude-code and prompts for login if unauth
-- STATUS: done
-- FILES: packages/cli/src/commands/setup.ts
-- VERIFY: cd packages/cli && pnpm build && node dist/index.js setup --help
-- CRITIC: review
-- SPEC:
-  Replace the hard-fail Claude CLI check with auto-install. After install, check if
-  ~/.claude.json exists; if not, exit cleanly with instructions to run `claude login`
-  and re-run setup.
-
-  In packages/cli/src/commands/setup.ts, modify the Claude CLI check block (currently
-  lines 96-103):
-
-  1. Wrap `execSync('claude --version', { stdio: 'ignore' })` in try/catch.
-
-  2. On success: print green check "Claude Code CLI installed", continue.
-
-  3. On failure (claude not in PATH):
-     a. Print: "Claude Code CLI not found. Installing automatically..."
-     b. Detect package manager (prefer pnpm if available):
-```ts
-        const pm = (() => {
-          try { execSync('pnpm --version', { stdio: 'ignore' }); return 'pnpm'; }
-          catch { return 'npm'; }
-        })();
-        const installCmd = pm === 'pnpm'
-          ? 'pnpm add -g @anthropic-ai/claude-code'
-          : 'npm install -g @anthropic-ai/claude-code';
-```
-     c. Run the install with `execSync(installCmd, { stdio: 'inherit' })` so user sees
-        progress and any permission errors live.
-     d. Re-verify: `execSync('claude --version', { stdio: 'ignore' })`. If still fails,
-        print red error with the install command that was tried, exit 1.
-     e. On success: print green check, continue.
-
-  4. AFTER the Claude CLI check (whether passed initially or auto-installed), add a NEW
-     check for ~/.claude.json existence:
-```ts
-     import { existsSync } from "node:fs";
-     import { homedir } from "node:os";
-     import { join } from "node:path";
-
-     const claudeAuthPath = join(homedir(), ".claude.json");
-     if (!existsSync(claudeAuthPath)) {
-       console.log("");
-       console.log(chalk.yellow("⚠ Authentication required."));
-       console.log("  Run: " + chalk.cyan("claude login"));
-       console.log("  Then re-run: " + chalk.cyan("noxdev setup"));
-       console.log("");
-       process.exit(0);
-     }
-```
-     (Match the existing chalk and console.log patterns in setup.ts.)
-
-  This new auth check sits between the Claude CLI check and the Docker checks. If auth
-  is missing, setup exits cleanly with instructions — does NOT proceed to Docker build
-  (no point until auth works).
-
-  Do NOT:
-  - Attempt to invoke `claude login` automatically (it's interactive OAuth).
-  - Add @anthropic-ai/claude-code as a noxdev package.json dependency (it stays a global
-    peer tool).
-  - Modify the existing Node version check (step A1) or Docker checks.
-
-## T8: Doctor adds "Claude Code CLI in PATH" check
+## T1: noxdev doctor — honest messages for uv and python3
 - STATUS: done
 - FILES: packages/cli/src/commands/doctor.ts
-- VERIFY: cd packages/cli && pnpm build && node dist/index.js doctor
-- CRITIC: review
-- SPEC:
-  Doctor currently checks for ~/.claude.json (auth file existence) but does NOT check
-  whether the `claude` CLI is actually installed and in PATH. Add this check.
-
-  In packages/cli/src/commands/doctor.ts, add a new check that runs BEFORE the existing
-  "Claude credentials" check (which is around line 165):
-
-```ts
-  {
-    name: "Claude Code CLI",
-    check: () => {
-      try {
-        const version = execSync('claude --version', {
-          encoding: 'utf-8',
-          stdio: ['ignore', 'pipe', 'ignore']
-        }).trim();
-        return { ok: true, detail: version };
-      } catch {
-        return {
-          ok: false,
-          detail: "claude not in PATH. Run: noxdev setup (auto-installs)"
-        };
-      }
-    },
-    critical: true
-  }
-```
-
-  Match the existing check-object shape used elsewhere in doctor.ts. If the structure
-  uses a different pattern (e.g., async, different field names), adapt accordingly.
-
-  Update the total check count display so it dynamically reflects the actual count
-  (e.g., `${passed}/${total}` where total = checks.length, not a hardcoded 11).
-
-  Do NOT modify any other check. Do NOT change the existing Claude credentials check —
-  it stays as file-existence (per decision: real auth validation isn't possible without
-  triggering OAuth).
-
-## T9: Doctor adds "node:sqlite available" check
-- STATUS: done
-- FILES: packages/cli/src/commands/doctor.ts
-- VERIFY: cd packages/cli && pnpm build && node dist/index.js doctor | grep -q "node:sqlite"
+- VERIFY: cd packages/cli && pnpm build && ! grep -q "available in Docker" src/commands/doctor.ts && ! grep -q "not required for noxdev" src/commands/doctor.ts && grep -q "noxdev demo" src/commands/doctor.ts && grep -q "astral.sh/uv/install.sh" src/commands/doctor.ts
 - CRITIC: skip
 - SPEC:
-  Add a check that confirms node:sqlite is available. With Node 24+ this should always
-  pass — the check is documentation as much as validation, and protects against future
-  Node versions that might gate it behind a flag again.
+  Doctor currently tells users that missing uv and python3 are "not required
+  for noxdev - available in Docker". This is false — both are invoked on the
+  HOST by noxdev demo:
+    - demo.ts:298 calls execSync('uv sync', { cwd: ... }) on host
+    - demo.ts:167 generates an npm script "dev:backend" that runs uv run uvicorn on host
+    - python3 is required by uv run on host
 
-  In packages/cli/src/commands/doctor.ts, add a new check immediately before the existing
-  "SQLite database" check (around line 107):
+  The "available in Docker" reassurance was written when noxdev was 100%
+  Docker-based and never updated as host-side features grew.
 
-```ts
-  {
-    name: "node:sqlite available",
-    check: async () => {
-      try {
-        await import("node:sqlite");
-        return { ok: true, detail: "built-in" };
-      } catch (err: any) {
-        return {
-          ok: false,
-          detail: `node:sqlite unavailable: ${err.message}. Requires Node >=24.`
-        };
-      }
-    },
-    critical: true
+  In packages/cli/src/commands/doctor.ts find the python3 check (around line
+  158-165) and the uv check (around line 168-175). Replace their failure
+  messages with honest, actionable ones. Both must REMAIN non-fatal warnings
+  (yellow, critical: false) — a user not running noxdev demo can still run
+  noxdev. They just need to know the truth about what's missing and why.
+
+  python3 failure message — platform-specific install hint:
+    message: "python3 not found on host (required for `noxdev demo` FastAPI scaffold)"
+    hint on darwin:  "Install: brew install python3"
+    hint elsewhere:  "Install: apt install python3   # or your distro equivalent"
+
+  uv failure message — universal install command (works Mac and Linux):
+    message: "uv not found on host (required for `noxdev demo` and Python project workflows)"
+    hint:    "Install: curl -LsSf https://astral.sh/uv/install.sh | sh"
+
+  Use process.platform === 'darwin' to switch the python3 hint.
+
+  Do NOT change pass-state messages. Do NOT touch any other doctor checks.
+  Do NOT change the pass-count / total-count math.
+
+## T2: noxdev doctor — add age check, tighten SOPS message
+- STATUS: done
+- FILES: packages/cli/src/commands/doctor.ts
+- VERIFY: cd packages/cli && pnpm build && grep -q "age --version" src/commands/doctor.ts && grep -qE "(API key|api fallback|sops -d)" src/commands/doctor.ts
+- CRITIC: skip
+- SPEC:
+  Two findings from the doctor audit (.audits/audit-doctor-reassurances-2026-04-15.md):
+
+  RISK 4 — age is the default secrets provider (config/index.ts:24:
+  provider: "age") but doctor.ts has no check for it. setup.ts:232 checks for
+  age and warns if missing, but a user running noxdev doctor after a manual
+  install (skipping noxdev setup) would not be warned.
+
+  RISK 3 — SOPS check at doctor.ts:148-155 is non-critical with terse message
+  "SOPS not found. Secrets encryption unavailable." This does not convey that
+  SOPS is needed for the API fallback code path (auth/index.ts:39 calls
+  sops -d to decrypt the API key when Max credentials are unavailable).
+
+  Step 1 — Add an age check immediately after the SOPS check. Same pattern
+  as the existing tool checks. Yellow warn (critical: false). Failure
+  message:
+    message: "age not found on host (required for SOPS-based secrets encryption)"
+    hint:    "Install: see https://github.com/FiloSottile/age#installation"
+
+  Use the same try/catch + execSync('age --version', { stdio: 'pipe' })
+  pattern as the existing checks.
+
+  Step 2 — Tighten the SOPS check failure message:
+    message: "SOPS not found on host (required for API key decryption when api fallback is enabled)"
+    hint:    "Install: see https://github.com/getsops/sops#download"
+
+  Both checks remain non-critical (critical: false / yellow warn) — users
+  not using API fallback don't strictly need either tool.
+
+  Do NOT change the SOPS check structure or position. Do NOT add age to any
+  other code path. Do NOT touch python3 or uv checks (covered by T1).
+
+## T3: noxdev demo validates uv and python3 at start with clear error
+- STATUS: done
+- FILES: packages/cli/src/commands/demo.ts
+- VERIFY: cd packages/cli && pnpm build && grep -q "uv --version" src/commands/demo.ts && grep -q "python3 --version" src/commands/demo.ts && grep -q "astral.sh/uv/install.sh" src/commands/demo.ts
+- CRITIC: skip
+- SPEC:
+  noxdev demo currently fails partway through scaffolding with a uv-related
+  error if uv is not installed on the host. This wastes time and leaves a
+  half-scaffolded project on disk.
+
+  In packages/cli/src/commands/demo.ts add a prerequisite check at the very
+  start of the demo command function, BEFORE any scaffolding work begins.
+  Place it as the first thing the function does after argument parsing.
+
+  uv check (universal install command — works Mac and Linux):
+  ```ts
+  try {
+    const version = execSync('uv --version', { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+    console.log(chalk.green(`✓ ${version}`));
+  } catch {
+    console.error(chalk.red('✖ uv not found.'));
+    console.error(chalk.gray('  noxdev demo requires uv for Python project scaffolding.'));
+    console.error(chalk.gray('  Install: curl -LsSf https://astral.sh/uv/install.sh | sh'));
+    process.exit(1);
   }
-```
+  ```
 
-  Adapt to the existing check structure in the file. Update total check count display
-  (now should be 13 with T8 + T9 added, but use checks.length not a hardcoded number).
+  python3 check (platform-specific install hint):
+  ```ts
+  try {
+    const version = execSync('python3 --version', { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+    console.log(chalk.green(`✓ ${version}`));
+  } catch {
+    console.error(chalk.red('✖ python3 not found.'));
+    console.error(chalk.gray('  noxdev demo requires Python 3 for the FastAPI scaffold.'));
+    const installCmd = process.platform === 'darwin'
+      ? 'brew install python3'
+      : 'apt install python3   # or your distro equivalent';
+    console.error(chalk.gray(`  Install: ${installCmd}`));
+    process.exit(1);
+  }
+  ```
 
-  The existing "SQLite database" check (~line 107) that opens the ledger DB stays. It now
-  uses node:sqlite via openDb() per T2 — but in doctor.ts the import path may need updating
-  if it directly imports better-sqlite3 still. Verify and update if so.
+  Make sure execSync is imported from 'node:child_process' if not already.
+  Make sure chalk is imported if not already.
 
-## T10: Update README.md and packages/cli/README.md for v1.3.0
+  Do NOT modify the rest of the demo logic. Do NOT change Docker checks
+  (separate concern — those are for the agent runtime).
+
+## T4: dashboard tsup config — preserve node: prefix
+- STATUS: done
+- FILES: packages/dashboard/tsup.config.ts, packages/dashboard/package.json
+- VERIFY: cd packages/dashboard && pnpm build && grep -q "node:sqlite" dist/api/server.js && ! grep -qE "from ['\"]sqlite['\"]" dist/api/server.js
+- CRITIC: skip
+- SPEC:
+  noxdev dashboard fails at runtime with:
+    Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'sqlite' imported from
+      .../dist/dashboard/api/server.js
+
+  Same root cause as v1.3.1's CLI fix: tsup v8 defaults removeNodeProtocol
+  to true, which strips the `node:` prefix from
+  `import { DatabaseSync } from 'node:sqlite'` during the dashboard API
+  build, leaving `from 'sqlite'` which Node cannot resolve (no such package
+  exists; node:sqlite is a Node built-in addressed only via the prefix).
+
+  v1.3.1 fixed this in packages/cli/tsup.config.ts but the dashboard has its
+  own tsup invocation (originally per Phase D T1 spec:
+    "build:api": "tsup src/api/server.ts --format esm --target node18 --outDir dist/api"
+  ) which never received the fix.
+
+  Step 1 — Create packages/dashboard/tsup.config.ts (or update if it exists):
+  ```ts
+  import { defineConfig } from 'tsup';
+
+  export default defineConfig({
+    entry: ['src/api/server.ts'],
+    format: ['esm'],
+    target: 'node24',
+    outDir: 'dist/api',
+    removeNodeProtocol: false,
+    clean: false,
+  });
+  ```
+
+  Note target bumped from node18 → node24 to match the v1.3.0 minimum-Node
+  bump. node:sqlite needs Node 22+ anyway.
+
+  Step 2 — Update packages/dashboard/package.json build:api script to use
+  the config file instead of inline flags:
+    "build:api": "tsup --config tsup.config.ts"
+  Remove the inline --format / --target / --outDir flags since they're now
+  in the config file.
+
+  Do NOT touch the frontend Vite build (the React app build script).
+  Do NOT change anything in packages/cli/.
+
+## T5: cost tracking — fix path encoding in findLatestSessionFile
+- STATUS: done
+- FILES: packages/cli/src/cost/parser.ts, packages/cli/src/engine/orchestrator.ts
+- VERIFY: cd packages/cli && pnpm build && grep -q "/workspace" src/cost/parser.ts && grep -q "findLatestSessionFile" src/engine/orchestrator.ts && ! grep -q "findLatestSessionFile(worktreeDir" src/engine/orchestrator.ts
+- CRITIC: skip
+- SPEC:
+  Per .audits/audit-cost-tracking-2026-04-15.md RISK 3 (the root cause of
+  "noxdev cost — No cost data found"):
+
+  findLatestSessionFile in packages/cli/src/cost/parser.ts (around line 62)
+  is called from the host with the host worktree path
+  (e.g. /home/eugene218/projects/foo-worktree). It encodes that as
+  -home-eugene218-projects-foo-worktree and looks in
+  ~/.claude/projects/-home-eugene218-projects-foo-worktree/
+
+  But inside the Docker container (per docker-run-max.sh line 49):
+    - worktree is mounted at /workspace (-v "$worktree_dir":/workspace)
+    - HOME=/tmp
+    - Claude Code's CWD is /workspace
+    - Claude Code encodes the project dir as "-workspace"
+    - Session files written at /tmp/.claude/projects/-workspace/*.jsonl
+    - Via volume mount these land on host at ~/.claude/projects/-workspace/
+
+  The host lookup never matches the container-encoded path. Lookup always
+  returns null. captureTaskCost always returns the all-zero/null struct.
+  Every task_results row has model = NULL. The downstream
+  `AND tr.model IS NOT NULL` filter in cost.ts then excludes everything.
+
+  Fix:
+
+  Step 1 — In packages/cli/src/cost/parser.ts, change findLatestSessionFile
+  signature to NOT take worktreePath. Instead use a hardcoded constant for
+  the container CWD:
+
+  ```ts
+  // Container CWD as mounted by docker-run-{max,api}.sh
+  // Claude Code encodes this as the project directory key.
+  const CONTAINER_WORKSPACE = '/workspace';
+
+  export function findLatestSessionFile(afterTimestamp: number): string | null {
+    const projectKey = CONTAINER_WORKSPACE.replaceAll('/', '-'); // "-workspace"
+    const projectsDir = path.join(os.homedir(), '.claude', 'projects', projectKey);
+    if (!fs.existsSync(projectsDir)) return null;
+
+    const files = fs.readdirSync(projectsDir)
+      .filter(f => f.endsWith('.jsonl'))
+      .map(f => {
+        const full = path.join(projectsDir, f);
+        return { full, mtimeMs: fs.statSync(full).mtimeMs };
+      })
+      .filter(f => f.mtimeMs >= afterTimestamp)
+      .sort((a, b) => b.mtimeMs - a.mtimeMs);
+
+    return files.length > 0 ? files[0].full : null;
+  }
+  ```
+
+  Preserve the existing imports (fs, path, os) — they should already be there.
+  Preserve the existing parseSessionUsage function unchanged.
+
+  Step 2 — In packages/cli/src/engine/orchestrator.ts find the call site
+  (around line 29-68 inside captureTaskCost) and update the call:
+
+  Before:
+    const sessionFile = findLatestSessionFile(worktreeDir, containerStartMs);
+
+  After:
+    const sessionFile = findLatestSessionFile(containerStartMs);
+
+  Remove the worktreeDir argument (it was the bug source). The function no
+  longer accepts a path arg.
+
+  Known limitation to document in the CHANGELOG (T8): if two parallel noxdev
+  runs from different terminal windows start within the same millisecond and
+  write to the same -workspace project key, cost attribution between them
+  could cross. The mtime + containerStartMs filter handles non-simultaneous
+  parallel runs correctly. Genuine sub-millisecond simultaneity is rare
+  enough to be future work.
+
+  Do NOT modify pricing.ts. Do NOT modify the schema or queries.ts.
+  Do NOT touch the `model IS NOT NULL` filter in cost.ts — that filter is
+  correct in intent (excluding pre-v1.2.0 rows) and will work as designed
+  once model is no longer always null.
+
+## T6: cost tracking — add ~/.claude mount to docker-run-api.sh
+- STATUS: done
+- FILES: packages/cli/scripts/docker-run-api.sh
+- VERIFY: grep -E "^\s*-v.*\.claude" packages/cli/scripts/docker-run-api.sh
+- CRITIC: skip
+- SPEC:
+  Per .audits/audit-cost-tracking-2026-04-15.md RISK 2 (high severity):
+
+  docker-run-max.sh line 51 mounts host ~/.claude into the container so
+  Claude Code's session logs survive container removal:
+    -v ~/.claude:/tmp/.claude
+
+  docker-run-api.sh has NO equivalent mount. API-mode runs write session
+  logs inside the container only, then `docker run --rm` destroys them.
+  Cost data is impossible to capture for API-mode runs without this mount.
+
+  Fix: in packages/cli/scripts/docker-run-api.sh, add the same
+  -v ~/.claude:/tmp/.claude line that docker-run-max.sh has. Place it
+  next to the other volume mount lines (around the same position as in
+  docker-run-max.sh — typically right after the worktree mount).
+
+  Use the same exact form as docker-run-max.sh — including the path quoting
+  style used in that file. Match the conventions of the existing script.
+
+  Do NOT change any other line in docker-run-api.sh. Do NOT add the mount
+  anywhere else. Do NOT touch docker-run-max.sh.
+
+## T7: README — add uv as required, version bump
 - STATUS: done
 - FILES: README.md, packages/cli/README.md
-- VERIFY: ! grep -rni "better-sqlite3\|npm rebuild" README.md packages/cli/README.md && grep -q "Node.js >= 24" README.md && grep -qi "WSL2" README.md
-- CRITIC: review
-- SPEC:
-  Update both READMEs to reflect v1.3.0 reality.
-
-  In README.md:
-
-  1. Update Requirements section:
-     - Change "Node.js >= 20 < 23" to "Node.js >= 24"
-     - Change "Claude CLI (`claude login` required)" to "Claude Code CLI (auto-installed by `noxdev setup`; run `claude login` after)"
-     - Add: "Windows users: run noxdev under WSL2. Native Windows is not supported."
-
-  2. Update version badge (line 9) from `1.2.0` to `1.3.0`.
-
-  3. Remove or update any reference to `npm rebuild better-sqlite3` if present.
-
-  4. In the "Built With" section (or equivalent), if better-sqlite3 was mentioned, replace
-     with mention of node:sqlite (Node's built-in SQLite). If no such section exists, no change.
-
-  In packages/cli/README.md:
-
-  5. Same Node version bump and WSL2 note.
-
-  6. Remove any line referencing `noxdev merge` if still present (safety net — should already
-     be gone from prior cleanup, but verify).
-
-  Do NOT touch:
-  - DECISIONS.md, CHANGELOG.md historical entries, session handoffs.
-  - Anything outside the Requirements/badge sections unless explicitly listed above.
-
-## T11: CHANGELOG entry for v1.3.0
-- STATUS: done
-- FILES: CHANGELOG.md, packages/cli/package.json, packages/dashboard/package.json
-- VERIFY: grep -q "## \[1.3.0\]" CHANGELOG.md && grep -q '"version": "1.3.0"' packages/cli/package.json
+- VERIFY: grep -q "uv" README.md && grep -q "uv" packages/cli/README.md && grep -q "astral.sh/uv/install.sh" README.md
 - CRITIC: skip
 - SPEC:
-  Add a CHANGELOG entry for v1.3.0 and bump version strings.
+  Add uv to the Requirements section of both READMEs.
 
-  1. In CHANGELOG.md, add a new section above [1.2.0]:
+  In README.md and packages/cli/README.md Requirements section, add this
+  bullet, placed after the Claude Code CLI line and before SOPS + age:
 
-```markdown
-  ## [1.3.0] - 2026-04-14
+  ```markdown
+  - uv (required for `noxdev demo` and Python project workflows)
+    - Install: `curl -LsSf https://astral.sh/uv/install.sh | sh` (works on Mac and Linux)
+  ```
 
-  ### Breaking
-  - Node.js minimum bumped to 24. Node 22 is no longer supported.
-    This enables use of the built-in `node:sqlite` module and eliminates native binary install pain.
+  In README.md only, also update any version badge or version reference
+  from 1.3.1 (whichever it currently shows) to 1.3.2.
 
-  ### Removed
-  - `better-sqlite3` dependency. Replaced with Node's built-in `node:sqlite` module.
-  - `check-native.js` postinstall script (no native dependencies left to validate).
-  - "rebuild better-sqlite3" troubleshooting from documentation (no longer applicable).
+  Do NOT touch any other README sections.
+
+## T8: CHANGELOG entry for v1.3.2 + version bumps
+- STATUS: done
+- FILES: CHANGELOG.md, packages/cli/package.json, packages/dashboard/package.json
+- VERIFY: grep -q "## \[1.3.2\]" CHANGELOG.md && grep -q '"version": "1.3.2"' packages/cli/package.json && grep -q '"version": "1.3.2"' packages/dashboard/package.json
+- CRITIC: skip
+- SPEC:
+  Add a CHANGELOG entry above [1.3.1] and bump version strings in both
+  package.json files.
+
+  In CHANGELOG.md, add this new section above [1.3.1]:
+
+  ```markdown
+  ## [1.3.2] - 2026-04-15
+
+  ### Fixed
+  - `noxdev cost` now actually returns cost data. Path encoding mismatch in
+    the session file lookup (host path vs container `/workspace` path) caused
+    every task to write `model = NULL` and zero cost data. The downstream
+    `model IS NOT NULL` filter then excluded everything, returning "No cost
+    data found" on every invocation since v1.2.0 shipped. Fixed by encoding
+    from the container workspace constant instead of the host worktree path.
+  - `docker-run-api.sh` now mounts `~/.claude` into the container, matching
+    `docker-run-max.sh`. Without this mount, API-mode runs could not capture
+    session logs at all (container ephemerality), making cost data
+    impossible regardless of any other fix.
+  - `noxdev dashboard` no longer crashes with `ERR_MODULE_NOT_FOUND` for
+    `sqlite` on startup. The dashboard's tsup build config was missing the
+    `removeNodeProtocol: false` setting that v1.3.1 added to the CLI build,
+    causing the same `node:` prefix stripping bug in the dashboard API
+    bundle.
+  - `noxdev doctor` no longer falsely reassures users that missing host
+    tools (uv, python3) are "available in Docker". They aren't — `noxdev
+    demo` runs both on the host. Doctor now states what each tool is needed
+    for and gives platform-specific install commands.
+  - `noxdev doctor` SOPS message now explains it's needed for API key
+    decryption when api fallback is enabled (was previously a terse
+    "encryption unavailable").
+  - `noxdev demo` now validates uv and Python3 are installed on the host
+    before starting any scaffolding. Previously failed mid-scaffold with a
+    confusing error.
 
   ### Added
-  - `noxdev setup` now auto-installs `@anthropic-ai/claude-code` if not in PATH.
-  - `noxdev setup` detects missing Claude authentication and exits cleanly with instructions to run `claude login`.
-  - `noxdev doctor` now checks for Claude Code CLI in PATH (separate from credentials check).
-  - `noxdev doctor` now checks for `node:sqlite` availability.
+  - `noxdev doctor` now checks for `age` (the default secrets provider).
+    Previously only `setup.ts` warned about it; users running `doctor` after
+    a manual install would not be warned.
 
-  ### Changed
-  - All SQLite access migrated from `better-sqlite3` to `node:sqlite`.
-  - Internal: introduced `openDb()` helper as the single canonical DB connection point.
-```
+  ### Documentation
+  - README and packages/cli/README now list `uv` as a required dependency
+    with the universal cross-platform install command.
 
-  2. Bump version in packages/cli/package.json: `"version": "1.3.0"`
-  3. Bump version in packages/dashboard/package.json: `"version": "1.3.0"`
-  4. If root package.json has a version, bump it too.
+  ### Known limitations
+  - Cost tracking still uses a single `-workspace` project key shared by all
+    noxdev runs on the host. The mtime + containerStartMs filter handles
+    non-simultaneous parallel runs correctly, but two runs starting in the
+    same millisecond from different terminals could cross-attribute costs.
+    Sub-millisecond simultaneity is rare enough to be future work.
+  ```
+
+  Bump version in packages/cli/package.json: `"version": "1.3.2"`
+  Bump version in packages/dashboard/package.json: `"version": "1.3.2"`
 
   Do NOT modify any earlier CHANGELOG entries.
-
