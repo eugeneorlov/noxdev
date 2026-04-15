@@ -1,385 +1,511 @@
-# v1.3.2 — honest doctor, working dashboard, working cost tracking
+# Cost display restructure — projects → runs → tasks hierarchy
 
-# Scope: Three audit-driven fix bundles plus README + version cuts.
-#   1. Doctor: stop lying about Docker fallbacks for host-side tools
-#   2. Demo: validate host prereqs at start instead of mid-scaffold crash
-#   3. Dashboard: fix tsup node: prefix strip (same root cause as v1.3.1 CLI fix)
-#   4. Cost tracking: fix path encoding mismatch + missing API-mode volume mount
-#   5. README: list uv as required
-#   6. CHANGELOG + version bump
+# Source audits (read into Project before planning the next round):
+#   .audits/audit-cost-display-2026-04-15-v0.md
+#   .audits/audit-cost-capture-postfix-2026-04-15.md
 #
-# Source audits (read these into Project before planning the next round):
-#   .audits/audit-doctor-reassurances-2026-04-15.md
-#   .audits/audit-cost-tracking-2026-04-15.md
+# Premise: v1.3.2 fixed cost CAPTURE. This TASKS.md fixes cost DISPLAY — the
+# missing per-project and per-run views. After this work lands, the user can
+# answer:
+#   - Which projects are eating budget? (Overview cost stat per project card)
+#   - What did this work session cost? (RunDetail rollup)
+#   - Was any single task expensive? (drill-down via existing TaskDetail)
+#   - Am I leaning too much on API vs Max? (split visible at every level)
 #
-# Dependencies: clean main at v1.3.1
-# Gate: pnpm build && pnpm test pass; doctor honest; demo fails-fast on missing prereq;
-#       noxdev dashboard runs without ERR_MODULE_NOT_FOUND; noxdev cost shows real data
-#       after at least one new run completes.
+# UX hierarchy after this work:
+#   Overview              → all projects, totals, project cards with cost stat
+#     Project view (NEW)  → project totals + runs table, click-through per run
+#       Run Detail        → run rollup + task rows with cost column
+#         Task Detail     → existing per-task cost section (unchanged)
 #
-# CRITIC: skip on all tasks. Verification done via post-run audit comparing actual diffs
-# against this TASKS.md, not via critic agent (per recurring critic-reliability issue).
+# CRITICAL DATA-MODEL CONSTRAINT (encode in every relevant spec):
+#   task_id values are NOT unique across runs. Every TASKS.md reuses T1, T2, ...
+#   NEVER aggregate by task_id at project or global level. Always GROUP BY run_id,
+#   then drill down to tasks within a single run.
+#
+# Dependencies: clean main at v1.3.2 published. Capture validated working
+#   (one fresh run produces a row with non-null model and cost_usd > 0)
+#   BEFORE merging any of this — otherwise the display is built on an
+#   unverified foundation. The display CODE is independent of capture state,
+#   but visual sanity checks during development require real data.
+#
+# Gate: pnpm build && pnpm test pass; noxdev dashboard renders Project view
+#   with runs table; noxdev cost defaults to per-project breakdown.
+#
+# CRITIC: skip on all tasks. Verification done via post-run audit comparing
+# actual diffs against this TASKS.md.
 
-## T1: noxdev doctor — honest messages for uv and python3
+## T1: per-run cost query + /api/cost/runs/:runId endpoint
 - STATUS: done
-- FILES: packages/cli/src/commands/doctor.ts
-- VERIFY: cd packages/cli && pnpm build && ! grep -q "available in Docker" src/commands/doctor.ts && ! grep -q "not required for noxdev" src/commands/doctor.ts && grep -q "noxdev demo" src/commands/doctor.ts && grep -q "astral.sh/uv/install.sh" src/commands/doctor.ts
+- FILES: packages/cli/src/db/queries.ts, packages/dashboard/src/api/routes/cost.ts
+- VERIFY: cd packages/cli && pnpm build && cd ../dashboard && pnpm build && grep -q "getRunCostBreakdown\|getRunCost" packages/cli/dist/db/queries.js && grep -q "/runs/:runId\|/runs/:run_id" packages/dashboard/dist/api/server.js
 - CRITIC: skip
 - SPEC:
-  Doctor currently tells users that missing uv and python3 are "not required
-  for noxdev - available in Docker". This is false — both are invoked on the
-  HOST by noxdev demo:
-    - demo.ts:298 calls execSync('uv sync', { cwd: ... }) on host
-    - demo.ts:167 generates an npm script "dev:backend" that runs uv run uvicorn on host
-    - python3 is required by uv run on host
+  Foundation for RunDetail cost rollup (T5) and consumed by Project view runs
+  table (T6).
 
-  The "available in Docker" reassurance was written when noxdev was 100%
-  Docker-based and never updated as host-side features grew.
+  Step 1 — In packages/cli/src/db/queries.ts, add a query function:
+  getRunCostBreakdown(db, runId) returning a single row:
+  {
+    run_id: string,
+    total_tasks: number,
+    tasks_with_cost: number,           // count where model IS NOT NULL
+    input_tokens: number,
+    output_tokens: number,
+    cache_read_tokens: number,
+    cache_write_tokens: number,
+    api_tasks: number,                 // count where auth_mode_cost = 'api'
+    api_cost_usd: number,
+    max_tasks: number,                 // count where auth_mode_cost = 'max'
+    max_cost_usd_equivalent: number
+  }
 
-  In packages/cli/src/commands/doctor.ts find the python3 check (around line
-  158-165) and the uv check (around line 168-175). Replace their failure
-  messages with honest, actionable ones. Both must REMAIN non-fatal warnings
-  (yellow, critical: false) — a user not running noxdev demo can still run
-  noxdev. They just need to know the truth about what's missing and why.
+  Query pattern (match existing style in cost.ts:83-100):
+  ```sql
+  SELECT
+    r.id as run_id,
+    COUNT(*) as total_tasks,
+    SUM(CASE WHEN tr.model IS NOT NULL THEN 1 ELSE 0 END) as tasks_with_cost,
+    COALESCE(SUM(tr.input_tokens), 0) as input_tokens,
+    COALESCE(SUM(tr.output_tokens), 0) as output_tokens,
+    COALESCE(SUM(tr.cache_read_tokens), 0) as cache_read_tokens,
+    COALESCE(SUM(tr.cache_write_tokens), 0) as cache_write_tokens,
+    SUM(CASE WHEN tr.auth_mode_cost = 'api' THEN 1 ELSE 0 END) as api_tasks,
+    COALESCE(SUM(CASE WHEN tr.auth_mode_cost = 'api' THEN tr.cost_usd ELSE 0 END), 0) as api_cost_usd,
+    SUM(CASE WHEN tr.auth_mode_cost = 'max' THEN 1 ELSE 0 END) as max_tasks,
+    COALESCE(SUM(CASE WHEN tr.auth_mode_cost = 'max' THEN tr.cost_usd ELSE 0 END), 0) as max_cost_usd_equivalent
+  FROM task_results tr
+  JOIN runs r ON tr.run_id = r.id
+  WHERE r.id = ?
+  GROUP BY r.id
+  ```
 
-  python3 failure message — platform-specific install hint:
-    message: "python3 not found on host (required for `noxdev demo` FastAPI scaffold)"
-    hint on darwin:  "Install: brew install python3"
-    hint elsewhere:  "Install: apt install python3   # or your distro equivalent"
+  Note: NO `AND model IS NOT NULL` filter at the top level — we want to count
+  all tasks in the run (including those without cost data) so the "tasks with
+  cost / total tasks" ratio is visible.
 
-  uv failure message — universal install command (works Mac and Linux):
-    message: "uv not found on host (required for `noxdev demo` and Python project workflows)"
-    hint:    "Install: curl -LsSf https://astral.sh/uv/install.sh | sh"
+  Step 2 — In packages/dashboard/src/api/routes/cost.ts add endpoint:
+  GET /api/cost/runs/:runId
+  Returns the single object from getRunCostBreakdown.
+  404 if run not found.
 
-  Use process.platform === 'darwin' to switch the python3 hint.
+  Match existing route patterns in the same file. Use the same try/catch +
+  500 error handling.
 
-  Do NOT change pass-state messages. Do NOT touch any other doctor checks.
-  Do NOT change the pass-count / total-count math.
+  Do NOT modify cost.ts CLI command (separate task).
+  Do NOT modify any existing query.
 
-## T2: noxdev doctor — add age check, tighten SOPS message
+## T2: per-project detail endpoint + per-run rows
 - STATUS: done
-- FILES: packages/cli/src/commands/doctor.ts
-- VERIFY: cd packages/cli && pnpm build && grep -q "age --version" src/commands/doctor.ts && grep -qE "(API key|api fallback|sops -d)" src/commands/doctor.ts
+- FILES: packages/dashboard/src/api/routes/cost.ts
+- VERIFY: cd packages/dashboard && pnpm build && grep -q "/projects/:projectId\|/projects/:project_id" packages/dashboard/dist/api/server.js && grep -q "runs" packages/dashboard/dist/api/server.js
 - CRITIC: skip
 - SPEC:
-  Two findings from the doctor audit (.audits/audit-doctor-reassurances-2026-04-15.md):
+  Backend for the new ProjectView page (T6).
 
-  RISK 4 — age is the default secrets provider (config/index.ts:24:
-  provider: "age") but doctor.ts has no check for it. setup.ts:232 checks for
-  age and warns if missing, but a user running noxdev doctor after a manual
-  install (skipping noxdev setup) would not be warned.
+  In packages/dashboard/src/api/routes/cost.ts add:
+  GET /api/cost/projects/:projectId
 
-  RISK 3 — SOPS check at doctor.ts:148-155 is non-critical with terse message
-  "SOPS not found. Secrets encryption unavailable." This does not convey that
-  SOPS is needed for the API fallback code path (auth/index.ts:39 calls
-  sops -d to decrypt the API key when Max credentials are unavailable).
+  Returns:
+  {
+    project: { id, display_name, repo_path },
+    totals: {
+      total_runs: number,
+      total_tasks: number,
+      tasks_with_cost: number,
+      input_tokens, output_tokens, cache_read_tokens, cache_write_tokens,
+      api_tasks, api_cost_usd,
+      max_tasks, max_cost_usd_equivalent
+    },
+    runs: [
+      {
+        run_id: string,
+        started_at: string,
+        finished_at: string | null,
+        duration_seconds: number | null,
+        auth_mode: string,
+        status: string,
+        total_tasks: number,
+        tasks_with_cost: number,
+        api_cost_usd: number,
+        max_cost_usd_equivalent: number,
+        total_cost_usd: number  // api + max
+      },
+      ...
+    ]
+  }
 
-  Step 1 — Add an age check immediately after the SOPS check. Same pattern
-  as the existing tool checks. Yellow warn (critical: false). Failure
-  message:
-    message: "age not found on host (required for SOPS-based secrets encryption)"
-    hint:    "Install: see https://github.com/FiloSottile/age#installation"
+  runs array sorted by started_at DESC (newest first).
+  404 if project not found.
 
-  Use the same try/catch + execSync('age --version', { stdio: 'pipe' })
-  pattern as the existing checks.
+  Implementation: two queries.
 
-  Step 2 — Tighten the SOPS check failure message:
-    message: "SOPS not found on host (required for API key decryption when api fallback is enabled)"
-    hint:    "Install: see https://github.com/getsops/sops#download"
+  Query 1 — project totals (one row):
+  ```sql
+  SELECT
+    p.id, p.display_name, p.repo_path,
+    COUNT(DISTINCT r.id) as total_runs,
+    COUNT(tr.id) as total_tasks,
+    SUM(CASE WHEN tr.model IS NOT NULL THEN 1 ELSE 0 END) as tasks_with_cost,
+    COALESCE(SUM(tr.input_tokens), 0) as input_tokens,
+    COALESCE(SUM(tr.output_tokens), 0) as output_tokens,
+    COALESCE(SUM(tr.cache_read_tokens), 0) as cache_read_tokens,
+    COALESCE(SUM(tr.cache_write_tokens), 0) as cache_write_tokens,
+    SUM(CASE WHEN tr.auth_mode_cost = 'api' THEN 1 ELSE 0 END) as api_tasks,
+    COALESCE(SUM(CASE WHEN tr.auth_mode_cost = 'api' THEN tr.cost_usd ELSE 0 END), 0) as api_cost_usd,
+    SUM(CASE WHEN tr.auth_mode_cost = 'max' THEN 1 ELSE 0 END) as max_tasks,
+    COALESCE(SUM(CASE WHEN tr.auth_mode_cost = 'max' THEN tr.cost_usd ELSE 0 END), 0) as max_cost_usd_equivalent
+  FROM projects p
+  LEFT JOIN runs r ON r.project_id = p.id
+  LEFT JOIN task_results tr ON tr.run_id = r.id
+  WHERE p.id = ?
+  GROUP BY p.id, p.display_name, p.repo_path
+  ```
 
-  Both checks remain non-critical (critical: false / yellow warn) — users
-  not using API fallback don't strictly need either tool.
+  Query 2 — per-run rows (multi-row, GROUP BY run):
+  ```sql
+  SELECT
+    r.id as run_id,
+    r.started_at, r.finished_at, r.duration_seconds,
+    r.auth_mode, r.status,
+    COUNT(tr.id) as total_tasks,
+    SUM(CASE WHEN tr.model IS NOT NULL THEN 1 ELSE 0 END) as tasks_with_cost,
+    COALESCE(SUM(CASE WHEN tr.auth_mode_cost = 'api' THEN tr.cost_usd ELSE 0 END), 0) as api_cost_usd,
+    COALESCE(SUM(CASE WHEN tr.auth_mode_cost = 'max' THEN tr.cost_usd ELSE 0 END), 0) as max_cost_usd_equivalent,
+    COALESCE(SUM(tr.cost_usd), 0) as total_cost_usd
+  FROM runs r
+  LEFT JOIN task_results tr ON tr.run_id = r.id
+  WHERE r.project_id = ?
+  GROUP BY r.id, r.started_at, r.finished_at, r.duration_seconds, r.auth_mode, r.status
+  ORDER BY r.started_at DESC
+  ```
 
-  Do NOT change the SOPS check structure or position. Do NOT add age to any
-  other code path. Do NOT touch python3 or uv checks (covered by T1).
+  IMPORTANT: GROUP BY run_id (not task_id). Task IDs are reused across runs
+  and are not unique at project level — aggregating by task_id would silently
+  collapse different tasks together.
 
-## T3: noxdev demo validates uv and python3 at start with clear error
+  Match existing route patterns in the same file. Use the same try/catch.
+
+  Do NOT modify other routes.
+
+## T3: Overview project cards — add cost stat per project
 - STATUS: done
-- FILES: packages/cli/src/commands/demo.ts
-- VERIFY: cd packages/cli && pnpm build && grep -q "uv --version" src/commands/demo.ts && grep -q "python3 --version" src/commands/demo.ts && grep -q "astral.sh/uv/install.sh" src/commands/demo.ts
+- FILES: packages/dashboard/src/api/routes/projects.ts, packages/dashboard/src/components/RunCard.tsx
+- VERIFY: cd packages/dashboard && pnpm build && grep -q "cost_usd\|total_cost" packages/dashboard/dist/api/server.js && grep -q "cost\|Cost" packages/dashboard/dist/assets/*.js
 - CRITIC: skip
 - SPEC:
-  noxdev demo currently fails partway through scaffolding with a uv-related
-  error if uv is not installed on the host. This wastes time and leaves a
-  half-scaffolded project on disk.
+  Each project card on the Overview page should show a small cost stat so the
+  user can see at a glance which projects are accumulating cost.
 
-  In packages/cli/src/commands/demo.ts add a prerequisite check at the very
-  start of the demo command function, BEFORE any scaffolding work begins.
-  Place it as the first thing the function does after argument parsing.
+  Step 1 — In packages/dashboard/src/api/routes/projects.ts (the existing
+  endpoint that powers Overview project cards), add cost fields to the
+  returned per-project object:
+    total_cost_usd: number      // api + max equivalent across all this project's runs
+    total_runs: number          // count of runs for this project
 
-  uv check (universal install command — works Mac and Linux):
+  Modify the existing query to LEFT JOIN task_results and SUM cost_usd,
+  COUNT(DISTINCT runs.id). Do not break existing fields.
+
+  Step 2 — In packages/dashboard/src/components/RunCard.tsx (the project
+  card component used on Overview), add a small line near the bottom of the
+  card showing:
+    "$X.XX • N runs"  (where $X.XX is total_cost_usd, N is total_runs)
+
+  If total_cost_usd is 0 AND there are runs, show:
+    "no cost data • N runs"  (distinguish from "$0.00 • N runs")
+
+  If there are zero runs, show nothing additional (the existing "No runs
+  yet" placeholder stays).
+
+  Use the same Tailwind class vocabulary as the rest of the card. Make this
+  the smallest text style on the card — it's a glanceable stat, not a
+  headline.
+
+  Do NOT modify the rest of RunCard. Do NOT modify Overview.tsx beyond what
+  prop type changes require.
+
+## T4: Implement ProjectView page + add /projects/:id route
+- STATUS: pending
+- FILES: packages/dashboard/src/pages/ProjectView.tsx, packages/dashboard/src/App.tsx
+- VERIFY: cd packages/dashboard && pnpm build && grep -q "ProjectView\|projectId" packages/dashboard/dist/assets/*.js && grep -q "/projects/" packages/dashboard/dist/assets/*.js
+- CRITIC: skip
+- SPEC:
+  Replace the placeholder ProjectView with a real page showing project totals
+  and a runs table. This is the headline UX of this release.
+
+  Step 1 — In packages/dashboard/src/App.tsx add a route:
+    /projects/:projectId  →  <ProjectView />
+
+  Add it next to the existing routes. Pattern matches the existing
+  /runs/:runId route.
+
+  Step 2 — In packages/dashboard/src/pages/ProjectView.tsx replace the
+  placeholder content. Use useParams() to get projectId. Use useApi() (the
+  existing hook) to fetch GET /api/cost/projects/:projectId.
+
+  Layout (top to bottom):
+
+  Header:
+    - Back link: "← Back to Overview"
+    - h1: project display_name
+    - Subtitle: repo_path in muted/mono text
+    - Status row: total_runs, total_tasks ("N tasks across M runs")
+
+  Project totals card (use same visual language as CostSummary on Overview):
+    Three cards in a row:
+      "API Cost" (green)        — $X.XX, "N tasks" subtitle
+      "Max Equivalent" (orange) — $X.XX, "N tasks" subtitle
+      "Total Tokens" (blue)     — compact M/K, "N tasks with cost data" subtitle
+
+    If totals.tasks_with_cost === 0 AND totals.total_tasks > 0, show a banner
+    above the cards:
+      "No cost data captured yet — runs from before v1.3.2 do not have token data."
+
+  Runs table (the new core view):
+    Columns: Date | Run ID | Tasks | Duration | API $ | Max $ (equiv) | Total
+    Each row clickable, navigates to /runs/:runId
+    Sort: started_at DESC by default
+    Status badge inline with the run ID (use existing StatusBadge component)
+    Format date/time consistently with RunDetail page
+    Format tasks as "M/N" where M = tasks_with_cost, N = total_tasks
+      (so user can see at a glance "8/8" = full coverage, "0/12" = no data)
+    Format costs: use the unified formatCost (T8) — 2 decimals here
+
+  Empty states:
+    - Zero runs: "No runs yet for this project. Run: noxdev run <project>"
+    - Project not found (404 from API): "Project not found. ← Back to Overview"
+
+  Use the same Tailwind/shadcn-style vocabulary as Overview and RunDetail.
+  Match the existing site visual language exactly — do not invent new
+  components when existing ones (StatusBadge, card patterns) work.
+
+  Do NOT add expand-to-show-tasks UX for this release — clicking a run row
+  navigates to RunDetail which has the per-task breakdown (T5). Simpler scope.
+
+## T5: RunDetail — add cost rollup header + cost column on task rows
+- STATUS: pending
+- FILES: packages/dashboard/src/pages/RunDetail.tsx, packages/dashboard/src/components/TaskRow.tsx
+- VERIFY: cd packages/dashboard && pnpm build && grep -q "cost\|Cost" packages/dashboard/dist/assets/*.js
+- CRITIC: skip
+- SPEC:
+  RunDetail currently has zero cost references (per audit). Add:
+
+  Step 1 — In packages/dashboard/src/pages/RunDetail.tsx, fetch cost data for
+  this run alongside the existing task data:
+    useApi('/api/cost/runs/' + runId)  → returns getRunCostBreakdown shape (see T1)
+
+  Step 2 — Add a cost rollup section to the run header, between the existing
+  metadata (started/finished/auth mode) and the task list. Three-card layout
+  matching CostSummary visual style:
+    "API Cost" (green)        — $X.XX from api_cost_usd, "N tasks" subtitle
+    "Max Equivalent" (orange) — $X.XX from max_cost_usd_equivalent, "N tasks"
+    "Total Tokens" (blue)     — compact M/K of input + output
+
+  If tasks_with_cost === 0 AND total_tasks > 0, replace the cards with a
+  single muted banner:
+    "No cost data captured for this run."
+
+  Step 3 — TaskRow already has cost rendering (audit confirms TaskRow.tsx:108
+  renders formatCost). Verify it still renders correctly with real data after
+  T8's formatCost unification — no functional changes needed here unless
+  T8 changes the import path.
+
+  Do NOT modify the existing task list / status badge / progress bar.
+  Do NOT change task expand/collapse behavior.
+
+## T6: Restructure noxdev cost CLI
+- STATUS: pending
+- FILES: packages/cli/src/commands/cost.ts
+- VERIFY: cd packages/cli && pnpm build && grep -q "per-project\|projects" packages/cli/dist/commands/cost.js && grep -q "\\-\\-run\|run_id" packages/cli/dist/commands/cost.js
+- CRITIC: skip
+- SPEC:
+  Current behavior:
+    noxdev cost           → global totals (one summary)
+    noxdev cost <project> → single-project totals (one summary)
+    noxdev cost --all     → per-project breakdown table
+
+  Desired behavior (mirrors dashboard hierarchy):
+    noxdev cost                   → per-project breakdown table (current --all)
+    noxdev cost <project>         → per-run breakdown table for that project
+    noxdev cost --run <run-id>    → per-task breakdown for that run
+    noxdev cost --all             → still works (alias for default behavior — backwards compat)
+    noxdev cost --global          → NEW: explicit global totals (old default)
+
+  Why: the previous default (global totals) answered the least useful question
+  and required --all to get the actually-useful per-project view. Per-project
+  is the natural default.
+
+  Step 1 — Add new query function getPerRunCostData(db, projectId, sinceDate)
+  matching the shape of T2's runs array (returns per-run rows for one project).
+  If projectId is null, no rows. (--run uses T1's getRunCostBreakdown via a
+  different code path — single run, not project-scoped.)
+
+  Step 2 — Add per-run table renderer:
+    Header: "RUN ID                 STARTED    TASKS    DURATION    $API     $MAX-EQ   $TOTAL"
+    Each row: run_id, formatted started_at (date + time), tasks "M/N",
+    duration formatted, costs.
+    Total footer row.
+
+  Step 3 — Add per-task table renderer for --run:
+    Header: "TASK    STATUS    DURATION    MODEL                 TOKENS         $COST"
+    Each row: task_id, status, duration, truncated model name, total tokens,
+    cost_usd.
+    Total footer row.
+
+  Step 4 — Restructure the command flow:
+    - Default (no project, no --run, no --global, no --all): per-project table
+    - With <project> arg, no --run: per-run table for that project
+    - With --run <id>: per-task table for that run, ignore project arg
+    - With --global: old global-totals view (the current no-args output)
+    - With --all: same as default (per-project table)
+
+  Step 5 — All renderers must use the unified formatCost from T8 (consistent
+  precision across CLI commands).
+
+  Step 6 — Null handling: when tasks_with_cost === 0 but total_tasks > 0,
+  show a one-line note above the table:
+    "Note: N tasks have no cost data captured (broken capture pre-v1.3.2 or
+     model field is null)."
+  Keep the existing "No cost data found" message for genuinely empty result
+  sets.
+
+  CRITICAL: Per-project and per-run aggregations must GROUP BY project_id or
+  run_id respectively. NEVER aggregate by task_id at any level above
+  per-task — task IDs are reused across runs and TASKS.md files. Aggregating
+  by task_id would silently collapse different tasks.
+
+  Preserve --since flag behavior on all variants. Preserve existing
+  formatNumber helper. Existing types CostRow / TotalCostRow stay; add new
+  PerRunCostRow and PerTaskCostRow types as needed.
+
+  Do NOT remove the existing query functions even if some become unused —
+  some are still called by status.ts.
+
+## T7: Unify formatCost across CLI and dashboard
+- STATUS: pending
+- FILES: packages/cli/src/lib/format.ts, packages/cli/src/commands/cost.ts, packages/cli/src/commands/status.ts, packages/cli/src/commands/log.ts, packages/dashboard/src/lib/format.ts, packages/dashboard/src/components/TaskRow.tsx, packages/dashboard/src/components/CostSummary.tsx, packages/dashboard/src/pages/TaskDetail.tsx
+- VERIFY: cd packages/cli && pnpm build && cd ../dashboard && pnpm build && grep -c "function formatCost" packages/cli/src/commands/cost.ts packages/cli/src/commands/status.ts packages/cli/src/commands/log.ts | grep -v ":0" | wc -l | grep -q "^0$"
+- CRITIC: skip
+- SPEC:
+  Three different formatCost implementations exist with different precisions
+  (audit RISK 9):
+    cost.ts:    2 decimals → $1.40
+    status.ts:  2 decimals → $1.40
+    log.ts:     4 decimals → $1.4000
+    TaskRow.tsx: 3 decimals → $1.400 / $1.400*
+    TaskDetail.tsx (formatCostDisplay): 4 decimals → $1.4000 (api)
+    CostSummary.tsx: inline Intl.NumberFormat, 2-4 decimals
+
+  Same number, six different presentations. Confusing.
+
+  Standard going forward (one rule):
+    Aggregate views (totals, summaries, per-project, per-run): 2 decimals → $1.40
+    Per-task drilldown views: 4 decimals → $1.4000 (precision matters when costs are tiny)
+
+  Step 1 — Create packages/cli/src/lib/format.ts:
   ```ts
-  try {
-    const version = execSync('uv --version', { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
-    console.log(chalk.green(`✓ ${version}`));
-  } catch {
-    console.error(chalk.red('✖ uv not found.'));
-    console.error(chalk.gray('  noxdev demo requires uv for Python project scaffolding.'));
-    console.error(chalk.gray('  Install: curl -LsSf https://astral.sh/uv/install.sh | sh'));
-    process.exit(1);
+  export function formatCost(cost: number | null | undefined, mode: 'aggregate' | 'detail' = 'aggregate'): string {
+    if (cost == null) return '—';
+    if (cost === 0) return mode === 'detail' ? '$0.0000' : '$0.00';
+    const decimals = mode === 'detail' ? 4 : 2;
+    return `$${cost.toFixed(decimals)}`;
+  }
+
+  export function formatTokens(n: number | null | undefined): string {
+    if (n == null) return '—';
+    if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+    if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+    return n.toString();
+  }
+
+  export function formatTokensFull(n: number | null | undefined): string {
+    if (n == null) return '—';
+    return new Intl.NumberFormat('en-US').format(n);
   }
   ```
 
-  python3 check (platform-specific install hint):
-  ```ts
-  try {
-    const version = execSync('python3 --version', { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
-    console.log(chalk.green(`✓ ${version}`));
-  } catch {
-    console.error(chalk.red('✖ python3 not found.'));
-    console.error(chalk.gray('  noxdev demo requires Python 3 for the FastAPI scaffold.'));
-    const installCmd = process.platform === 'darwin'
-      ? 'brew install python3'
-      : 'apt install python3   # or your distro equivalent';
-    console.error(chalk.gray(`  Install: ${installCmd}`));
-    process.exit(1);
-  }
-  ```
+  Step 2 — Create packages/dashboard/src/lib/format.ts with the SAME
+  exported functions (mirror — dashboard cannot import from packages/cli).
+  Keep them identical character-for-character so behavior matches.
 
-  Make sure execSync is imported from 'node:child_process' if not already.
-  Make sure chalk is imported if not already.
+  Step 3 — Replace local formatCost / formatNumber / formatTokens
+  implementations in:
+    packages/cli/src/commands/cost.ts
+    packages/cli/src/commands/status.ts
+    packages/cli/src/commands/log.ts (use 'detail' mode)
+    packages/dashboard/src/components/TaskRow.tsx
+    packages/dashboard/src/components/CostSummary.tsx (use 'aggregate' mode)
+    packages/dashboard/src/pages/TaskDetail.tsx (use 'detail' mode)
+  Import the shared helper instead. Delete the local implementations.
 
-  Do NOT modify the rest of the demo logic. Do NOT change Docker checks
-  (separate concern — those are for the agent runtime).
+  Step 4 — TaskRow's auth-mode suffix ('*' for max with tooltip) is NOT part
+  of formatCost — it's the caller's job. Keep that logic local to TaskRow.
 
-## T4: dashboard tsup config — preserve node: prefix
-- STATUS: done
-- FILES: packages/dashboard/tsup.config.ts, packages/dashboard/package.json
-- VERIFY: cd packages/dashboard && pnpm build && grep -q "node:sqlite" dist/api/server.js && ! grep -qE "from ['\"]sqlite['\"]" dist/api/server.js
+  Do NOT change the auth-mode suffix conventions ((api), equivalent (max),
+  the asterisk pattern). Only the numeric format gets unified.
+
+## T8: Display totalCost in CostSummary, fix dead worktreePath param
+- STATUS: pending
+- FILES: packages/dashboard/src/components/CostSummary.tsx, packages/cli/src/cost/parser.ts, packages/cli/src/engine/orchestrator.ts
+- VERIFY: cd packages/cli && pnpm build && cd ../dashboard && pnpm build && grep -q "totalCost\|total" packages/dashboard/dist/assets/*.js && ! grep -q "worktreePath" packages/cli/dist/cost/parser.js
 - CRITIC: skip
 - SPEC:
-  noxdev dashboard fails at runtime with:
-    Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'sqlite' imported from
-      .../dist/dashboard/api/server.js
+  Two unrelated cleanups surfaced by the audits, bundled because each is
+  trivial alone.
 
-  Same root cause as v1.3.1's CLI fix: tsup v8 defaults removeNodeProtocol
-  to true, which strips the `node:` prefix from
-  `import { DatabaseSync } from 'node:sqlite'` during the dashboard API
-  build, leaving `from 'sqlite'` which Node cannot resolve (no such package
-  exists; node:sqlite is a Node built-in addressed only via the prefix).
+  Cleanup 1 — CostSummary computed totalCost (audit display RISK 10):
+  CostSummary.tsx:54 computes:
+    const totalCost = summary.api.cost_usd + summary.max.cost_usd_equivalent;
+  but never renders it. The user sees API cost and Max equivalent cost as
+  two separate numbers with no total — they have to add in their head.
 
-  v1.3.1 fixed this in packages/cli/tsup.config.ts but the dashboard has its
-  own tsup invocation (originally per Phase D T1 spec:
-    "build:api": "tsup src/api/server.ts --format esm --target node18 --outDir dist/api"
-  ) which never received the fix.
+  Add a 4th element to the layout (or expand the 3-card grid to show a total
+  beneath). Render as the unified formatCost (aggregate mode → 2 decimals).
+  Label it "Total" with subtitle "API + Max equivalent".
 
-  Step 1 — Create packages/dashboard/tsup.config.ts (or update if it exists):
-  ```ts
-  import { defineConfig } from 'tsup';
+  Cleanup 2 — captureTaskCost dead parameter (audit capture postfix):
+  packages/cli/src/engine/orchestrator.ts captureTaskCost signature is:
+    captureTaskCost(worktreePath, containerStartMs, authMode)
+  But after T5 of v1.3.2, worktreePath is never used inside the function —
+  findLatestSessionFile no longer takes it. The parameter is dead.
 
-  export default defineConfig({
-    entry: ['src/api/server.ts'],
-    format: ['esm'],
-    target: 'node24',
-    outDir: 'dist/api',
-    removeNodeProtocol: false,
-    clean: false,
-  });
-  ```
+  Remove worktreePath from the captureTaskCost signature. Update the call
+  site (orchestrator.ts itself, around the existing capture invocation) to
+  not pass it.
 
-  Note target bumped from node18 → node24 to match the v1.3.0 minimum-Node
-  bump. node:sqlite needs Node 22+ anyway.
+  Verify the worktree path is not used for anything else in captureTaskCost
+  before removing — if it has another use, leave it. (The audit confirms it
+  has no other use, but verify by reading the function before changing.)
 
-  Step 2 — Update packages/dashboard/package.json build:api script to use
-  the config file instead of inline flags:
-    "build:api": "tsup --config tsup.config.ts"
-  Remove the inline --format / --target / --outDir flags since they're now
-  in the config file.
+  Do NOT modify findLatestSessionFile (that's already correct).
 
-  Do NOT touch the frontend Vite build (the React app build script).
-  Do NOT change anything in packages/cli/.
-
-## T5: cost tracking — fix path encoding in findLatestSessionFile
-- STATUS: done
-- FILES: packages/cli/src/cost/parser.ts, packages/cli/src/engine/orchestrator.ts
-- VERIFY: cd packages/cli && pnpm build && grep -q "/workspace" src/cost/parser.ts && grep -q "findLatestSessionFile" src/engine/orchestrator.ts && ! grep -q "findLatestSessionFile(worktreeDir" src/engine/orchestrator.ts
+## T9: README — update cost section to match new structure
+- STATUS: pending
+- FILES: README.md
+- VERIFY: grep -q "noxdev cost" README.md && grep -q "per-project\|projects" README.md
 - CRITIC: skip
 - SPEC:
-  Per .audits/audit-cost-tracking-2026-04-15.md RISK 3 (the root cause of
-  "noxdev cost — No cost data found"):
+  The README cost section (lines 113-150 per audit) shows aspirational
+  example output for `noxdev cost --all` that:
+    (a) uses the OLD command structure
+    (b) has never matched real output (capture was broken pre-v1.3.2)
 
-  findLatestSessionFile in packages/cli/src/cost/parser.ts (around line 62)
-  is called from the host with the host worktree path
-  (e.g. /home/eugene218/projects/foo-worktree). It encodes that as
-  -home-eugene218-projects-foo-worktree and looks in
-  ~/.claude/projects/-home-eugene218-projects-foo-worktree/
+  Update the README cost section to:
+    1. Document the new command hierarchy:
+       - noxdev cost              (per-project breakdown — default)
+       - noxdev cost <project>    (per-run breakdown for one project)
+       - noxdev cost --run <id>   (per-task breakdown for one run)
+       - noxdev cost --global     (global totals across all projects)
+    2. Replace the example output blocks with realistic examples reflecting
+       the new structure. If no real output is available yet, use synthetic
+       but plausible numbers (clearly mark as illustrative).
+    3. Note that cost data is captured per-task starting from v1.3.2 — older
+       runs will appear with no cost data. This is expected.
+    4. Document the dashboard equivalents:
+       - Overview cards show project totals
+       - Click into a project for runs table
+       - Click into a run for per-task breakdown
 
-  But inside the Docker container (per docker-run-max.sh line 49):
-    - worktree is mounted at /workspace (-v "$worktree_dir":/workspace)
-    - HOME=/tmp
-    - Claude Code's CWD is /workspace
-    - Claude Code encodes the project dir as "-workspace"
-    - Session files written at /tmp/.claude/projects/-workspace/*.jsonl
-    - Via volume mount these land on host at ~/.claude/projects/-workspace/
-
-  The host lookup never matches the container-encoded path. Lookup always
-  returns null. captureTaskCost always returns the all-zero/null struct.
-  Every task_results row has model = NULL. The downstream
-  `AND tr.model IS NOT NULL` filter in cost.ts then excludes everything.
-
-  Fix:
-
-  Step 1 — In packages/cli/src/cost/parser.ts, change findLatestSessionFile
-  signature to NOT take worktreePath. Instead use a hardcoded constant for
-  the container CWD:
-
-  ```ts
-  // Container CWD as mounted by docker-run-{max,api}.sh
-  // Claude Code encodes this as the project directory key.
-  const CONTAINER_WORKSPACE = '/workspace';
-
-  export function findLatestSessionFile(afterTimestamp: number): string | null {
-    const projectKey = CONTAINER_WORKSPACE.replaceAll('/', '-'); // "-workspace"
-    const projectsDir = path.join(os.homedir(), '.claude', 'projects', projectKey);
-    if (!fs.existsSync(projectsDir)) return null;
-
-    const files = fs.readdirSync(projectsDir)
-      .filter(f => f.endsWith('.jsonl'))
-      .map(f => {
-        const full = path.join(projectsDir, f);
-        return { full, mtimeMs: fs.statSync(full).mtimeMs };
-      })
-      .filter(f => f.mtimeMs >= afterTimestamp)
-      .sort((a, b) => b.mtimeMs - a.mtimeMs);
-
-    return files.length > 0 ? files[0].full : null;
-  }
-  ```
-
-  Preserve the existing imports (fs, path, os) — they should already be there.
-  Preserve the existing parseSessionUsage function unchanged.
-
-  Step 2 — In packages/cli/src/engine/orchestrator.ts find the call site
-  (around line 29-68 inside captureTaskCost) and update the call:
-
-  Before:
-    const sessionFile = findLatestSessionFile(worktreeDir, containerStartMs);
-
-  After:
-    const sessionFile = findLatestSessionFile(containerStartMs);
-
-  Remove the worktreeDir argument (it was the bug source). The function no
-  longer accepts a path arg.
-
-  Known limitation to document in the CHANGELOG (T8): if two parallel noxdev
-  runs from different terminal windows start within the same millisecond and
-  write to the same -workspace project key, cost attribution between them
-  could cross. The mtime + containerStartMs filter handles non-simultaneous
-  parallel runs correctly. Genuine sub-millisecond simultaneity is rare
-  enough to be future work.
-
-  Do NOT modify pricing.ts. Do NOT modify the schema or queries.ts.
-  Do NOT touch the `model IS NOT NULL` filter in cost.ts — that filter is
-  correct in intent (excluding pre-v1.2.0 rows) and will work as designed
-  once model is no longer always null.
-
-## T6: cost tracking — add ~/.claude mount to docker-run-api.sh
-- STATUS: done
-- FILES: packages/cli/scripts/docker-run-api.sh
-- VERIFY: grep -E "^\s*-v.*\.claude" packages/cli/scripts/docker-run-api.sh
-- CRITIC: skip
-- SPEC:
-  Per .audits/audit-cost-tracking-2026-04-15.md RISK 2 (high severity):
-
-  docker-run-max.sh line 51 mounts host ~/.claude into the container so
-  Claude Code's session logs survive container removal:
-    -v ~/.claude:/tmp/.claude
-
-  docker-run-api.sh has NO equivalent mount. API-mode runs write session
-  logs inside the container only, then `docker run --rm` destroys them.
-  Cost data is impossible to capture for API-mode runs without this mount.
-
-  Fix: in packages/cli/scripts/docker-run-api.sh, add the same
-  -v ~/.claude:/tmp/.claude line that docker-run-max.sh has. Place it
-  next to the other volume mount lines (around the same position as in
-  docker-run-max.sh — typically right after the worktree mount).
-
-  Use the same exact form as docker-run-max.sh — including the path quoting
-  style used in that file. Match the conventions of the existing script.
-
-  Do NOT change any other line in docker-run-api.sh. Do NOT add the mount
-  anywhere else. Do NOT touch docker-run-max.sh.
-
-## T7: README — add uv as required, version bump
-- STATUS: done
-- FILES: README.md, packages/cli/README.md
-- VERIFY: grep -q "uv" README.md && grep -q "uv" packages/cli/README.md && grep -q "astral.sh/uv/install.sh" README.md
-- CRITIC: skip
-- SPEC:
-  Add uv to the Requirements section of both READMEs.
-
-  In README.md and packages/cli/README.md Requirements section, add this
-  bullet, placed after the Claude Code CLI line and before SOPS + age:
-
-  ```markdown
-  - uv (required for `noxdev demo` and Python project workflows)
-    - Install: `curl -LsSf https://astral.sh/uv/install.sh | sh` (works on Mac and Linux)
-  ```
-
-  In README.md only, also update any version badge or version reference
-  from 1.3.1 (whichever it currently shows) to 1.3.2.
-
-  Do NOT touch any other README sections.
-
-## T8: CHANGELOG entry for v1.3.2 + version bumps
-- STATUS: done
-- FILES: CHANGELOG.md, packages/cli/package.json, packages/dashboard/package.json
-- VERIFY: grep -q "## \[1.3.2\]" CHANGELOG.md && grep -q '"version": "1.3.2"' packages/cli/package.json && grep -q '"version": "1.3.2"' packages/dashboard/package.json
-- CRITIC: skip
-- SPEC:
-  Add a CHANGELOG entry above [1.3.1] and bump version strings in both
-  package.json files.
-
-  In CHANGELOG.md, add this new section above [1.3.1]:
-
-  ```markdown
-  ## [1.3.2] - 2026-04-15
-
-  ### Fixed
-  - `noxdev cost` now actually returns cost data. Path encoding mismatch in
-    the session file lookup (host path vs container `/workspace` path) caused
-    every task to write `model = NULL` and zero cost data. The downstream
-    `model IS NOT NULL` filter then excluded everything, returning "No cost
-    data found" on every invocation since v1.2.0 shipped. Fixed by encoding
-    from the container workspace constant instead of the host worktree path.
-  - `docker-run-api.sh` now mounts `~/.claude` into the container, matching
-    `docker-run-max.sh`. Without this mount, API-mode runs could not capture
-    session logs at all (container ephemerality), making cost data
-    impossible regardless of any other fix.
-  - `noxdev dashboard` no longer crashes with `ERR_MODULE_NOT_FOUND` for
-    `sqlite` on startup. The dashboard's tsup build config was missing the
-    `removeNodeProtocol: false` setting that v1.3.1 added to the CLI build,
-    causing the same `node:` prefix stripping bug in the dashboard API
-    bundle.
-  - `noxdev doctor` no longer falsely reassures users that missing host
-    tools (uv, python3) are "available in Docker". They aren't — `noxdev
-    demo` runs both on the host. Doctor now states what each tool is needed
-    for and gives platform-specific install commands.
-  - `noxdev doctor` SOPS message now explains it's needed for API key
-    decryption when api fallback is enabled (was previously a terse
-    "encryption unavailable").
-  - `noxdev demo` now validates uv and Python3 are installed on the host
-    before starting any scaffolding. Previously failed mid-scaffold with a
-    confusing error.
-
-  ### Added
-  - `noxdev doctor` now checks for `age` (the default secrets provider).
-    Previously only `setup.ts` warned about it; users running `doctor` after
-    a manual install would not be warned.
-
-  ### Documentation
-  - README and packages/cli/README now list `uv` as a required dependency
-    with the universal cross-platform install command.
-
-  ### Known limitations
-  - Cost tracking still uses a single `-workspace` project key shared by all
-    noxdev runs on the host. The mtime + containerStartMs filter handles
-    non-simultaneous parallel runs correctly, but two runs starting in the
-    same millisecond from different terminals could cross-attribute costs.
-    Sub-millisecond simultaneity is rare enough to be future work.
-  ```
-
-  Bump version in packages/cli/package.json: `"version": "1.3.2"`
-  Bump version in packages/dashboard/package.json: `"version": "1.3.2"`
-
-  Do NOT modify any earlier CHANGELOG entries.
+  Do NOT modify other README sections.
+  Do NOT modify CHANGELOG (cleanups in this round are not user-facing
+  enough to warrant a release note — handle in next version bump).

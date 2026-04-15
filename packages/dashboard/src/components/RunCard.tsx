@@ -43,7 +43,12 @@ export function RunCard({ project }: RunCardProps) {
   return (
     <div className="rounded-lg border border-gray-200 dark:border-[var(--nox-border)] bg-white dark:bg-[var(--nox-surface)] shadow-sm p-4 hover:shadow-md transition">
       <div className="flex items-start justify-between mb-3">
-        <h3 className="font-semibold text-lg text-gray-900 dark:text-gray-100">{displayName}</h3>
+        <Link
+          to={`/projects/${project.id}`}
+          className="font-semibold text-lg text-gray-900 dark:text-gray-100 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+        >
+          {displayName}
+        </Link>
         {hasRun && project.last_run_status && (
           <StatusBadge status={project.last_run_status} />
         )}
