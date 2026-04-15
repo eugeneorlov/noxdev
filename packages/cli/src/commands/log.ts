@@ -208,11 +208,11 @@ export async function logCommand(project?: string, taskId?: string): Promise<voi
     console.log(`  Cache write        ${formatNumber(taskResult.cache_write_tokens)}`);
 
     if (taskResult.auth_mode_cost === 'api') {
-      console.log(`  Cost               ${formatCost(taskResult.cost_usd, 4)}  (api)`);
+      console.log(`  Cost               ${formatCost(taskResult.cost_usd, 'detail')}  (api)`);
     } else if (taskResult.auth_mode_cost === 'max') {
-      console.log(`  Cost               ${formatCost(taskResult.cost_usd, 4)} equivalent  (max)`);
+      console.log(`  Cost               ${formatCost(taskResult.cost_usd, 'detail')} equivalent  (max)`);
     } else {
-      console.log(`  Cost               ${formatCost(taskResult.cost_usd, 4)}`);
+      console.log(`  Cost               ${formatCost(taskResult.cost_usd, 'detail')}`);
     }
   } else {
     console.log("Cost: no data captured");

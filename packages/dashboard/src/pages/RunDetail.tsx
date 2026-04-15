@@ -220,7 +220,7 @@ export default function RunDetail() {
             <div className="grid grid-cols-3 gap-4 mb-6">
               <div className="text-center bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
                 <div className="text-2xl font-bold text-green-600 dark:text-green-400">
-                  {formatCost(costData.api_cost_usd, 'currency', { minDecimals: 2, maxDecimals: 2 }) as string}
+                  {formatCost(costData.api_cost_usd, 'aggregate')}
                 </div>
                 <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                   Cost
@@ -232,7 +232,7 @@ export default function RunDetail() {
 
               <div className="text-center bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
                 <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">
-                  {formatCost(costData.max_cost_usd_equivalent, 'currency', { minDecimals: 2, maxDecimals: 2 }) as string}
+                  {formatCost(costData.max_cost_usd_equivalent, 'aggregate')}
                 </div>
                 <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                   Cost

@@ -84,14 +84,23 @@ export function TaskRow({ task, runId }: TaskRowProps) {
           <span className="text-sm text-gray-600 dark:text-gray-400 font-mono">
             {formatDuration(task.duration_seconds)}
           </span>
-          {(() => {
-            const costProps = formatCost(task.cost_usd, 'props', { authMode: task.auth_mode_cost }) as { text: string; className: string; title?: string } | null;
-            return costProps ? (
-              <span className={costProps.className} title={costProps.title}>
-                {costProps.text}
-              </span>
-            ) : null;
-          })()}
+          {task.cost_usd !== null && (
+            <span
+              className={
+                task.auth_mode_cost === 'api'
+                  ? "text-xs font-mono text-gray-600 dark:text-gray-400"
+                  : task.auth_mode_cost === 'max'
+                    ? "text-xs font-mono text-gray-500 dark:text-gray-500"
+                    : "text-xs font-mono text-gray-600 dark:text-gray-400"
+              }
+              title={task.auth_mode_cost === 'max' ? "Max equivalent API cost" : undefined}
+            >
+              {task.auth_mode_cost === 'max'
+                ? `${formatCost(task.cost_usd, 'aggregate')}*`
+                : formatCost(task.cost_usd, 'aggregate')
+              }
+            </span>
+          )}
           <span className="text-sm text-gray-600 dark:text-gray-400 font-mono">
             {truncateCommitSha(task.commit_sha)}
           </span>

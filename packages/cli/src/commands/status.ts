@@ -142,11 +142,11 @@ export function showProjectStatus(db: Database, projectId: string): void {
   // Show cost information
   const costData = getRunCost(db, run.id);
   if (costData && (costData.api_cost || costData.max_cost || costData.input_tokens || costData.output_tokens)) {
-    const apiCostStr = formatCost(costData.api_cost);
-    const maxCostStr = formatCost(costData.max_cost);
+    const apiCostStr = formatCost(costData.api_cost, 'aggregate');
+    const maxCostStr = formatCost(costData.max_cost, 'aggregate');
     const inputStr = formatTokens(costData.input_tokens);
     const outputStr = formatTokens(costData.output_tokens);
-    console.log(`Cost: ${formatCost((costData.api_cost || 0) + (costData.max_cost || 0))}  ·  ${inputStr} input / ${outputStr} output tokens`);
+    console.log(`Cost: ${formatCost((costData.api_cost || 0) + (costData.max_cost || 0), 'aggregate')}  ·  ${inputStr} input / ${outputStr} output tokens`);
   }
 
   if (tasks.length > 0) {

@@ -278,9 +278,9 @@ function renderPerRunTable(runs: RunRow[], projectName: string, sinceRange: stri
     const tasksDisplay = formatTaskCount(run.completed, run.failed, run.skipped, run.total_tasks);
     const durationDisplay = formatDuration(run.started_at, run.finished_at);
 
-    const apiCostStr = run.api_cost_usd > 0 ? formatCost(run.api_cost_usd) : '$—';
-    const maxCostStr = run.max_cost_usd_equivalent > 0 ? formatCost(run.max_cost_usd_equivalent) : '$—';
-    const totalCostStr = formatCost(run.api_cost_usd + run.max_cost_usd_equivalent);
+    const apiCostStr = run.api_cost_usd > 0 ? formatCost(run.api_cost_usd, 'aggregate') : '—';
+    const maxCostStr = run.max_cost_usd_equivalent > 0 ? formatCost(run.max_cost_usd_equivalent, 'aggregate') : '—';
+    const totalCostStr = formatCost(run.api_cost_usd + run.max_cost_usd_equivalent, 'aggregate');
 
     console.log(
       `${runIdDisplay.padEnd(18)} ${startedDisplay.padEnd(10)} ${tasksDisplay.padEnd(8)} ${durationDisplay.padEnd(11)} ${totalCostStr.padStart(9)}`
@@ -293,7 +293,7 @@ function renderPerRunTable(runs: RunRow[], projectName: string, sinceRange: stri
 
   console.log("─────────────────────────────────────────────────────────────────────────────");
   console.log(
-    `${'TOTAL'.padEnd(18)} ${' '.padEnd(10)} ${' '.padEnd(8)} ${' '.padEnd(11)} ${formatCost(totalApiCost + totalMaxCost).padStart(9)}`
+    `${'TOTAL'.padEnd(18)} ${' '.padEnd(10)} ${' '.padEnd(8)} ${' '.padEnd(11)} ${formatCost(totalApiCost + totalMaxCost, 'aggregate').padStart(9)}`
   );
 
   if (totalTasksWithCost > 0) {
@@ -322,7 +322,7 @@ function renderPerTaskTable(tasks: TaskRow[], runId: string): void {
     const duration = formatDuration(task.started_at, task.finished_at).padEnd(11);
     const model = truncateModel(task.model).padEnd(21);
     const tokens = formatTotalTokens(task.input_tokens, task.output_tokens).padStart(14);
-    const cost = formatCost(task.cost_usd || 0).padStart(9);
+    const cost = formatCost(task.cost_usd, 'aggregate').padStart(9);
 
     console.log(`${taskId} ${status} ${duration} ${model} ${tokens} ${cost}`);
 
@@ -332,7 +332,7 @@ function renderPerTaskTable(tasks: TaskRow[], runId: string): void {
 
   console.log("─────────────────────────────────────────────────────────────────────────");
   console.log(
-    `${'TOTAL'.padEnd(7)} ${' '.padEnd(9)} ${' '.padEnd(11)} ${' '.padEnd(21)} ${formatTotalTokens(totalTokens, 0).padStart(14)} ${formatCost(totalCost).padStart(9)}`
+    `${'TOTAL'.padEnd(7)} ${' '.padEnd(9)} ${' '.padEnd(11)} ${' '.padEnd(21)} ${formatTotalTokens(totalTokens, 0).padStart(14)} ${formatCost(totalCost, 'aggregate').padStart(9)}`
   );
 }
 
@@ -377,7 +377,7 @@ export function registerCost(program: Command): void {
           const apiTasks = Math.round((costData.api_cost || 0) > 0 ? costData.tasks * ((costData.api_cost || 0) / ((costData.api_cost || 0) + (costData.max_cost || 0))) : 0);
           const maxTasks = costData.tasks - apiTasks;
 
-          console.log(`Cost                   ${String(costData.tasks).padStart(2)} tasks    ${formatCost((costData.api_cost || 0) + (costData.max_cost || 0))}`);
+          console.log(`Cost                   ${String(costData.tasks).padStart(2)} tasks    ${formatCost((costData.api_cost || 0) + (costData.max_cost || 0), 'aggregate')}`);
 
           if (maxTasks > 0) {
             console.log("* Token-based cost combines API and equivalent Max usage costs.");
@@ -426,7 +426,7 @@ export function registerCost(program: Command): void {
               ? row.display_name.substring(0, 13) + '...'
               : row.display_name;
 
-            const totalCostStr = ((row.api_cost || 0) + (row.max_cost || 0)) > 0 ? formatCost((row.api_cost || 0) + (row.max_cost || 0)) + '*' : '$-';
+            const totalCostStr = ((row.api_cost || 0) + (row.max_cost || 0)) > 0 ? formatCost((row.api_cost || 0) + (row.max_cost || 0), 'aggregate') + '*' : '—';
 
             console.log(
               `${projectName.padEnd(16)} ${String(row.tasks).padStart(7)} ${formatNumber(row.input_tokens).padStart(9)} ${formatNumber(row.output_tokens).padStart(9)} ${totalCostStr.padStart(9)}`
@@ -441,7 +441,7 @@ export function registerCost(program: Command): void {
 
           console.log("────────────────────────────────────────────────────────────────");
           console.log(
-            `${'TOTAL'.padEnd(16)} ${String(totalTasks).padStart(7)} ${formatNumber(totalInputTokens).padStart(9)} ${formatNumber(totalOutputTokens).padStart(9)} ${formatCost(totalApiCost + totalMaxCost).padStart(9)}`
+            `${'TOTAL'.padEnd(16)} ${String(totalTasks).padStart(7)} ${formatNumber(totalInputTokens).padStart(9)} ${formatNumber(totalOutputTokens).padStart(9)} ${formatCost(totalApiCost + totalMaxCost, 'aggregate').padStart(9)}`
           );
 
           if (olderCount > 0) {

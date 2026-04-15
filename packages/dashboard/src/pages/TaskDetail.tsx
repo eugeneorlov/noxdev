@@ -218,7 +218,14 @@ export default function TaskDetail() {
                 </div>
                 <div>
                   <span className="text-gray-600 dark:text-gray-400 block">Cost:</span>
-                  <span className="font-mono">{formatCost(task.cost_usd, 'display', { authMode: task.auth_mode_cost, precision: 4 }) as string}</span>
+                  <span className="font-mono">
+                    {task.auth_mode_cost === 'api'
+                      ? `${formatCost(task.cost_usd, 'detail')} (api)`
+                      : task.auth_mode_cost === 'max'
+                        ? `${formatCost(task.cost_usd, 'detail')} equivalent (max)`
+                        : formatCost(task.cost_usd, 'detail')
+                    }
+                  </span>
                 </div>
               </div>
             ) : (
