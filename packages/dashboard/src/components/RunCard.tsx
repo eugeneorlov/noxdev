@@ -11,6 +11,9 @@ interface Project {
   failed?: number;
   total_tasks?: number;
   last_run_at?: string;
+  api_cost_usd?: number;
+  max_cost_usd_equivalent?: number;
+  total_cost_tasks?: number;
 }
 
 interface RunCardProps {
@@ -63,6 +66,17 @@ export function RunCard({ project }: RunCardProps) {
               {project.total_tasks || 0} total
             </span>
           </div>
+
+          {(project.total_cost_tasks || 0) > 0 && (
+            <div className="flex items-center gap-4 text-sm mt-1">
+              <span className="text-blue-600 dark:text-blue-400">
+                ${((project.api_cost_usd || 0) + (project.max_cost_usd_equivalent || 0)).toFixed(3)} cost
+              </span>
+              <span className="text-gray-500 dark:text-gray-400">
+                {project.total_cost_tasks || 0} cost tasks
+              </span>
+            </div>
+          )}
 
           <Link
             to={`/runs/${project.last_run_id}`}
