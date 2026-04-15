@@ -333,7 +333,7 @@
   shape. Do NOT remove the "View run details" link.
 
 ## T7: Rename "Total Tokens" card label to "Tokens" everywhere it appears
-- STATUS: pending
+- STATUS: done
 - FILES: packages/dashboard/src/components/CostSummary.tsx, packages/dashboard/src/pages/RunDetail.tsx, packages/dashboard/src/pages/ProjectView.tsx
 - VERIFY: cd packages/dashboard && pnpm build && ! grep -r "Total Tokens" packages/dashboard/src/components/ packages/dashboard/src/pages/
 - CRITIC: skip
@@ -358,7 +358,7 @@
   conventions). Do NOT change CLI strings.
 
 ## T8: cost.ts per-project table — print footnote at bottom (Round A regression)
-- STATUS: pending
+- STATUS: done
 - FILES: packages/cli/src/commands/cost.ts
 - VERIFY: cd packages/cli && pnpm build && grep -q "Token-based cost" packages/cli/src/commands/cost.ts && node packages/cli/dist/index.js cost 2>&1 | grep -q "Token-based cost"
 - CRITIC: skip
@@ -389,7 +389,7 @@
   `"* Token-based cost. Max-mode tasks show equivalent API cost."`).
 
 ## T9: README — document ProjectView and updated CLI footnote wording
-- STATUS: pending
+- STATUS: done
 - FILES: README.md
 - VERIFY: grep -q "Project view\|/projects/" README.md && grep -q "Token-based cost. Max-mode tasks show equivalent API cost." README.md
 - CRITIC: skip
