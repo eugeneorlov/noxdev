@@ -4,6 +4,7 @@ import path from "node:path";
 import { existsSync, readFileSync } from "node:fs";
 import chalk from "chalk";
 import { getDb } from "../db/index.js";
+import { formatCost, formatNumber } from "../lib/format.js";
 
 interface TaskResultRow {
   id: number;
@@ -71,15 +72,6 @@ function statusBadge(status: string): string {
   }
 }
 
-function formatNumber(num: number | null): string {
-  if (num === null) return '0';
-  return new Intl.NumberFormat('en-US').format(num);
-}
-
-function formatCost(cost: number | null): string {
-  if (cost === null || cost === 0) return '$0.00';
-  return `$${cost.toFixed(4)}`;
-}
 
 export async function logCommand(project?: string, taskId?: string): Promise<void> {
   const db = getDb();
@@ -216,11 +208,11 @@ export async function logCommand(project?: string, taskId?: string): Promise<voi
     console.log(`  Cache write        ${formatNumber(taskResult.cache_write_tokens)}`);
 
     if (taskResult.auth_mode_cost === 'api') {
-      console.log(`  Cost               ${formatCost(taskResult.cost_usd)}  (api)`);
+      console.log(`  Cost               ${formatCost(taskResult.cost_usd, 4)}  (api)`);
     } else if (taskResult.auth_mode_cost === 'max') {
-      console.log(`  Cost               ${formatCost(taskResult.cost_usd)} equivalent  (max)`);
+      console.log(`  Cost               ${formatCost(taskResult.cost_usd, 4)} equivalent  (max)`);
     } else {
-      console.log(`  Cost               ${formatCost(taskResult.cost_usd)}`);
+      console.log(`  Cost               ${formatCost(taskResult.cost_usd, 4)}`);
     }
   } else {
     console.log("Cost: no data captured");

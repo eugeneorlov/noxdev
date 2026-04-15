@@ -3,6 +3,7 @@ import type { Database } from "../db/connection.js";
 import chalk from "chalk";
 import { getDb } from "../db/index.js";
 import { getProject, getAllProjects, getPerRunCostData, getPerTaskCostData } from "../db/queries.js";
+import { formatCost, formatNumber } from "../lib/format.js";
 
 interface CostRow {
   project_id: string;
@@ -88,15 +89,6 @@ function parseSinceDate(since: string): string {
   throw new Error(`Invalid --since format: ${since}. Use '7d', '30d', 'YYYY-MM-DD', or 'all'`);
 }
 
-function formatNumber(num: number | null): string {
-  if (num === null) return '0';
-  return new Intl.NumberFormat('en-US').format(num);
-}
-
-function formatCost(cost: number | null): string {
-  if (cost === null || cost === 0) return '$0.00';
-  return `$${cost.toFixed(2)}`;
-}
 
 function formatSinceRange(since: string): string {
   if (since === 'all') {

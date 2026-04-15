@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { ChevronRight } from 'lucide-react';
 import { StatusBadge } from './StatusBadge';
 import { useApi } from '../hooks/useApi';
+import { getCostProps } from '../lib/format';
 
 interface TaskResult {
   id: number;
@@ -51,28 +52,6 @@ export function TaskRow({ task, runId }: TaskRowProps) {
     return sha.substring(0, 7);
   };
 
-  const formatCost = (cost: number | null, authModeValue: string | null): JSX.Element | null => {
-    if (!cost || cost === 0) return null;
-
-    if (authModeValue === 'api') {
-      return (
-        <span className="text-xs font-mono text-gray-600 dark:text-gray-400">
-          ${cost.toFixed(3)}
-        </span>
-      );
-    } else if (authModeValue === 'max') {
-      return (
-        <span
-          className="text-xs font-mono text-gray-500 dark:text-gray-500"
-          title="Max equivalent API cost"
-        >
-          ${cost.toFixed(3)}*
-        </span>
-      );
-    }
-
-    return null;
-  };
 
 
   const parseTaskFiles = (files: string | null): string[] => {
@@ -105,7 +84,14 @@ export function TaskRow({ task, runId }: TaskRowProps) {
           <span className="text-sm text-gray-600 dark:text-gray-400 font-mono">
             {formatDuration(task.duration_seconds)}
           </span>
-          {formatCost(task.cost_usd, task.auth_mode_cost)}
+          {(() => {
+            const costProps = getCostProps(task.cost_usd, task.auth_mode_cost);
+            return costProps ? (
+              <span className={costProps.className} title={costProps.title}>
+                {costProps.text}
+              </span>
+            ) : null;
+          })()}
           <span className="text-sm text-gray-600 dark:text-gray-400 font-mono">
             {truncateCommitSha(task.commit_sha)}
           </span>

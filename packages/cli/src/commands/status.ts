@@ -12,6 +12,7 @@ import {
   getAllProjectSummaries,
   formatSummaryTable,
 } from "../engine/summary.js";
+import { formatCost } from "../lib/format.js";
 
 interface RunRow {
   id: string;
@@ -88,10 +89,6 @@ function getRunCost(db: Database.Database, runId: string): RunCostRow | null {
   `).get(runId) as RunCostRow | null;
 }
 
-function formatCost(cost: number | null): string {
-  if (cost === null || cost === 0) return '$0.00';
-  return `$${cost.toFixed(2)}`;
-}
 
 function formatTokens(tokens: number | null): string {
   if (tokens === null || tokens === 0) return '0';

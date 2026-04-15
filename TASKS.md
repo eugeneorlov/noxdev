@@ -225,7 +225,7 @@
   prop type changes require.
 
 ## T4: Implement ProjectView page + add /projects/:id route
-- STATUS: pending
+- STATUS: done
 - FILES: packages/dashboard/src/pages/ProjectView.tsx, packages/dashboard/src/App.tsx
 - VERIFY: cd packages/dashboard && pnpm build && grep -q "ProjectView\|projectId" packages/dashboard/dist/assets/*.js && grep -q "/projects/" packages/dashboard/dist/assets/*.js
 - CRITIC: skip
@@ -283,7 +283,7 @@
   navigates to RunDetail which has the per-task breakdown (T5). Simpler scope.
 
 ## T5: RunDetail — add cost rollup header + cost column on task rows
-- STATUS: pending
+- STATUS: done
 - FILES: packages/dashboard/src/pages/RunDetail.tsx, packages/dashboard/src/components/TaskRow.tsx
 - VERIFY: cd packages/dashboard && pnpm build && grep -q "cost\|Cost" packages/dashboard/dist/assets/*.js
 - CRITIC: skip
@@ -314,7 +314,7 @@
   Do NOT change task expand/collapse behavior.
 
 ## T6: Restructure noxdev cost CLI
-- STATUS: pending
+- STATUS: done
 - FILES: packages/cli/src/commands/cost.ts
 - VERIFY: cd packages/cli && pnpm build && grep -q "per-project\|projects" packages/cli/dist/commands/cost.js && grep -q "\\-\\-run\|run_id" packages/cli/dist/commands/cost.js
 - CRITIC: skip

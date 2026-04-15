@@ -3,6 +3,7 @@ import { useApi } from '../hooks/useApi';
 import { StatusBadge } from '../components/StatusBadge';
 import { DiffViewer } from '../components/DiffViewer';
 import { useState } from 'react';
+import { formatCostDisplay, formatNumber } from '../lib/format';
 
 interface TaskDetailData {
   id: number;
@@ -73,22 +74,6 @@ export default function TaskDetail() {
     }
   };
 
-  const formatTokens = (tokens: number | null): string => {
-    if (tokens === null || tokens === undefined) return '—';
-    return new Intl.NumberFormat('en-US').format(tokens);
-  };
-
-  const formatCostDisplay = (cost: number | null, authModeCost: string | null): string => {
-    if (!cost) return '—';
-
-    const formattedCost = `$${cost.toFixed(4)}`;
-    if (authModeCost === 'api') {
-      return `${formattedCost} (api)`;
-    } else if (authModeCost === 'max') {
-      return `${formattedCost} equivalent (max)`;
-    }
-    return formattedCost;
-  };
 
 
   if (loading) {
@@ -217,19 +202,19 @@ export default function TaskDetail() {
                 </div>
                 <div>
                   <span className="text-gray-600 dark:text-gray-400 block">Input tokens:</span>
-                  <span className="font-mono">{formatTokens(task.input_tokens)}</span>
+                  <span className="font-mono">{formatNumber(task.input_tokens)}</span>
                 </div>
                 <div>
                   <span className="text-gray-600 dark:text-gray-400 block">Output tokens:</span>
-                  <span className="font-mono">{formatTokens(task.output_tokens)}</span>
+                  <span className="font-mono">{formatNumber(task.output_tokens)}</span>
                 </div>
                 <div>
                   <span className="text-gray-600 dark:text-gray-400 block">Cache read:</span>
-                  <span className="font-mono">{formatTokens(task.cache_read_tokens)}</span>
+                  <span className="font-mono">{formatNumber(task.cache_read_tokens)}</span>
                 </div>
                 <div>
                   <span className="text-gray-600 dark:text-gray-400 block">Cache write:</span>
-                  <span className="font-mono">{formatTokens(task.cache_write_tokens)}</span>
+                  <span className="font-mono">{formatNumber(task.cache_write_tokens)}</span>
                 </div>
                 <div>
                   <span className="text-gray-600 dark:text-gray-400 block">Cost:</span>

@@ -1,3 +1,5 @@
+import { formatCostIntl } from '../lib/format';
+
 interface CostSummaryData {
   tokens: {
     input: number;
@@ -64,10 +66,7 @@ export function CostSummary({ summary, loading }: CostSummaryProps) {
       <div className="grid grid-cols-3 gap-4">
         <div className="text-center">
           <div className="text-2xl font-bold text-green-600 dark:text-green-400">
-            ${new Intl.NumberFormat('en-US', {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 4
-            }).format(summary.api.cost_usd)}
+            ${formatCostIntl(summary.api.cost_usd)}
           </div>
           <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
             API Cost
@@ -79,10 +78,7 @@ export function CostSummary({ summary, loading }: CostSummaryProps) {
 
         <div className="text-center">
           <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">
-            ${new Intl.NumberFormat('en-US', {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 4
-            }).format(summary.max.cost_usd_equivalent)}
+            ${formatCostIntl(summary.max.cost_usd_equivalent)}
           </div>
           <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
             Max Equivalent Cost
