@@ -344,8 +344,7 @@ export function registerCost(program: Command): void {
     .option("--since <spec>", "time range: '7d', '30d', 'YYYY-MM-DD', or 'all'", "all")
     .option("--run <run-id>", "show per-task breakdown for specific run")
     .option("--global", "show global totals across all projects")
-    .option("--all", "show per-project breakdown (default behavior)")
-    .action((project: string | undefined, opts: { since: string; run?: string; global?: boolean; all?: boolean }) => {
+    .action((project: string | undefined, opts: { since: string; run?: string; global?: boolean }) => {
       try {
         const db = getDb();
         const sinceDate = parseSinceDate(opts.since);
