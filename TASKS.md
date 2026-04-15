@@ -7,7 +7,7 @@
 # building the redesign on the broken formatCost foundation.
 
 ## T1: Rewrite both lib/format.ts files to spec — identical mirrors with mode parameter
-- STATUS: pending
+- STATUS: done
 - FILES: packages/cli/src/lib/format.ts, packages/dashboard/src/lib/format.ts, packages/cli/src/commands/cost.ts, packages/cli/src/commands/status.ts, packages/cli/src/commands/log.ts, packages/dashboard/src/components/TaskRow.tsx, packages/dashboard/src/components/CostSummary.tsx, packages/dashboard/src/pages/TaskDetail.tsx, packages/dashboard/src/pages/RunDetail.tsx, packages/dashboard/src/components/RunCard.tsx
 - VERIFY: cd packages/cli && pnpm build && cd ../dashboard && pnpm build && diff packages/cli/src/lib/format.ts packages/dashboard/src/lib/format.ts && grep -q "mode: 'aggregate' | 'detail'" packages/cli/src/lib/format.ts && grep -q "mode: 'aggregate' | 'detail'" packages/dashboard/src/lib/format.ts && ! grep -rE "'basic'|'display'|'props'|'currency'" packages/dashboard/src/lib/format.ts packages/dashboard/src/components/ packages/dashboard/src/pages/ && node -e "const {formatCost} = require('./packages/cli/dist/lib/format.js'); if (formatCost(1.5, 'aggregate') !== '\$1.50') process.exit(1); if (formatCost(1.5, 'detail') !== '\$1.5000') process.exit(1); if (formatCost(null) !== '—') process.exit(1);"
 - CRITIC: skip
@@ -75,7 +75,7 @@
   identical mirrors.
 
 ## T2: Restructure CostSummary and RunDetail — collapse to 2 cards each + footnotes
-- STATUS: pending
+- STATUS: done
 - FILES: packages/dashboard/src/components/CostSummary.tsx, packages/dashboard/src/pages/RunDetail.tsx, packages/dashboard/src/lib/format.ts
 - VERIFY: cd packages/dashboard && pnpm build && grep -c "<Card" packages/dashboard/src/components/CostSummary.tsx | head -1 | grep -qE "^[12]$" && grep -q "Token-based cost. Max-mode tasks show equivalent API cost." packages/dashboard/src/components/CostSummary.tsx && grep -q "Token-based cost. Max-mode tasks show equivalent API cost." packages/dashboard/src/pages/RunDetail.tsx && grep -q "Input + output. Cache tokens shown in task detail." packages/dashboard/src/components/CostSummary.tsx && grep -q "Input + output. Cache tokens shown in task detail." packages/dashboard/src/pages/RunDetail.tsx && ! grep -q "Max equivalent API cost" packages/dashboard/src/lib/format.ts && grep -qE "grid-cols-2" packages/dashboard/src/components/CostSummary.tsx
 - CRITIC: skip
@@ -127,7 +127,7 @@
   hobby project, no users to break. Make the cut clean.
 
 ## T3: Add structural index for project-scoped queries
-- STATUS: pending
+- STATUS: done
 - FILES: packages/cli/src/db/migrate.ts, packages/cli/src/db/schema.sql
 - VERIFY: cd packages/cli && pnpm build && grep -q "idx_runs_project" packages/cli/src/db/schema.sql && grep -q "idx_runs_project" packages/cli/src/db/migrate.ts
 - CRITIC: skip
@@ -152,7 +152,7 @@
   Do NOT add other indexes. Do NOT touch other tables.
 
 ## T4: New endpoint GET /api/projects/:projectId/tasks for flat task list
-- STATUS: pending
+- STATUS: done
 - FILES: packages/dashboard/src/api/routes/projects.ts, packages/cli/src/db/queries.ts
 - VERIFY: cd packages/cli && pnpm build && cd ../dashboard && pnpm build && grep -q "/tasks" packages/dashboard/dist/api/server.js && grep -q "getProjectTaskExecutions" packages/cli/dist/db/queries.js
 - CRITIC: skip
@@ -238,7 +238,7 @@
   even if Round B doesn't use the runs aggregate route directly).
 
 ## T5: New ProjectView — totals header + flat sortable task table (drop runs table)
-- STATUS: pending
+- STATUS: done
 - FILES: packages/dashboard/src/pages/ProjectView.tsx
 - VERIFY: cd packages/dashboard && pnpm build && grep -q "/api/projects/.*tasks" packages/dashboard/src/pages/ProjectView.tsx && ! grep -q "Runs" packages/dashboard/src/pages/ProjectView.tsx && grep -qE "sort.*cost|sort.*date|sortBy" packages/dashboard/src/pages/ProjectView.tsx
 - CRITIC: skip
@@ -308,7 +308,7 @@
   TaskDetail.
 
 ## T6: Wire ProjectView into Overview project cards (clickable navigation)
-- STATUS: pending
+- STATUS: done
 - FILES: packages/dashboard/src/components/RunCard.tsx
 - VERIFY: cd packages/dashboard && pnpm build && grep -q "/projects/" packages/dashboard/src/components/RunCard.tsx
 - CRITIC: skip
