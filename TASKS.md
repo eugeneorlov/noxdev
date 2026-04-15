@@ -382,7 +382,7 @@
   some are still called by status.ts.
 
 ## T7: Unify formatCost across CLI and dashboard
-- STATUS: pending
+- STATUS: done
 - FILES: packages/cli/src/lib/format.ts, packages/cli/src/commands/cost.ts, packages/cli/src/commands/status.ts, packages/cli/src/commands/log.ts, packages/dashboard/src/lib/format.ts, packages/dashboard/src/components/TaskRow.tsx, packages/dashboard/src/components/CostSummary.tsx, packages/dashboard/src/pages/TaskDetail.tsx
 - VERIFY: cd packages/cli && pnpm build && cd ../dashboard && pnpm build && grep -c "function formatCost" packages/cli/src/commands/cost.ts packages/cli/src/commands/status.ts packages/cli/src/commands/log.ts | grep -v ":0" | wc -l | grep -q "^0$"
 - CRITIC: skip
@@ -445,7 +445,7 @@
   the asterisk pattern). Only the numeric format gets unified.
 
 ## T8: Display totalCost in CostSummary, fix dead worktreePath param
-- STATUS: pending
+- STATUS: done
 - FILES: packages/dashboard/src/components/CostSummary.tsx, packages/cli/src/cost/parser.ts, packages/cli/src/engine/orchestrator.ts
 - VERIFY: cd packages/cli && pnpm build && cd ../dashboard && pnpm build && grep -q "totalCost\|total" packages/dashboard/dist/assets/*.js && ! grep -q "worktreePath" packages/cli/dist/cost/parser.js
 - CRITIC: skip
@@ -480,7 +480,7 @@
   Do NOT modify findLatestSessionFile (that's already correct).
 
 ## T9: README — update cost section to match new structure
-- STATUS: pending
+- STATUS: done
 - FILES: README.md
 - VERIFY: grep -q "noxdev cost" README.md && grep -q "per-project\|projects" README.md
 - CRITIC: skip
