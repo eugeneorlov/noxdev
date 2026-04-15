@@ -189,3 +189,22 @@ export function abortOrphanedRuns(db: Database): number {
   ).run();
   return result.changes;
 }
+
+export function getRunCostBreakdown(db: Database, runId: string) {
+  return db.prepare(`
+    SELECT
+      COUNT(*) as total_tasks,
+      SUM(input_tokens) as input_tokens,
+      SUM(output_tokens) as output_tokens,
+      SUM(cache_read_tokens) as cache_read_tokens,
+      SUM(cache_write_tokens) as cache_write_tokens,
+      SUM(CASE WHEN auth_mode_cost = 'api' THEN cost_usd ELSE 0 END) as api_cost_usd,
+      SUM(CASE WHEN auth_mode_cost = 'max' THEN cost_usd ELSE 0 END) as max_cost_usd_equivalent,
+      COUNT(CASE WHEN auth_mode_cost = 'api' THEN 1 END) as api_tasks,
+      COUNT(CASE WHEN auth_mode_cost = 'max' THEN 1 END) as max_tasks,
+      MIN(started_at) as earliest_started_at,
+      MAX(finished_at) as latest_finished_at
+    FROM task_results
+    WHERE run_id = ? AND model IS NOT NULL
+  `).get(runId);
+}

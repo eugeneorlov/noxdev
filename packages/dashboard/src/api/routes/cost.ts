@@ -135,4 +135,61 @@ router.get('/projects', (req, res) => {
   }
 });
 
+// GET /api/cost/runs/:runId
+router.get('/runs/:runId', (req, res) => {
+  try {
+    const db = getDb();
+    const { runId } = req.params;
+
+    if (!runId) {
+      return res.status(400).json({ error: 'runId parameter is required' });
+    }
+
+    const result = db.prepare(`
+      SELECT
+        COUNT(*) as total_tasks,
+        SUM(input_tokens) as input_tokens,
+        SUM(output_tokens) as output_tokens,
+        SUM(cache_read_tokens) as cache_read_tokens,
+        SUM(cache_write_tokens) as cache_write_tokens,
+        SUM(CASE WHEN auth_mode_cost = 'api' THEN cost_usd ELSE 0 END) as api_cost_usd,
+        SUM(CASE WHEN auth_mode_cost = 'max' THEN cost_usd ELSE 0 END) as max_cost_usd_equivalent,
+        COUNT(CASE WHEN auth_mode_cost = 'api' THEN 1 END) as api_tasks,
+        COUNT(CASE WHEN auth_mode_cost = 'max' THEN 1 END) as max_tasks,
+        MIN(started_at) as earliest_started_at,
+        MAX(finished_at) as latest_finished_at
+      FROM task_results
+      WHERE run_id = ? AND model IS NOT NULL
+    `).get(runId) as any;
+
+    if (!result || result.total_tasks === 0) {
+      return res.status(404).json({ error: 'Run not found or no tasks with cost data' });
+    }
+
+    res.json({
+      run_id: runId,
+      tokens: {
+        input: result.input_tokens || 0,
+        output: result.output_tokens || 0,
+        cache_read: result.cache_read_tokens || 0,
+        cache_write: result.cache_write_tokens || 0
+      },
+      api: {
+        tasks: result.api_tasks || 0,
+        cost_usd: result.api_cost_usd || 0
+      },
+      max: {
+        tasks: result.max_tasks || 0,
+        cost_usd_equivalent: result.max_cost_usd_equivalent || 0
+      },
+      total_tasks: result.total_tasks || 0,
+      earliest_started_at: result.earliest_started_at,
+      latest_finished_at: result.latest_finished_at
+    });
+  } catch (error) {
+    console.error('Error fetching run cost breakdown:', error);
+    res.status(500).json({ error: 'Failed to fetch run cost breakdown' });
+  }
+});
+
 export default router;
