@@ -1,7 +1,4 @@
-// Defeat esbuild's node: prefix stripping by hiding the module name from static analysis.
-const sqliteModuleName = "node:sqlite";
-const sqlite = await import(sqliteModuleName);
-const DatabaseSync = sqlite.DatabaseSync as typeof import("node:sqlite").DatabaseSync;
+import { DatabaseSync } from "node:sqlite";
 
 export interface OpenDbOptions {
   readonly?: boolean;
