@@ -29,3 +29,21 @@ export function formatNumber(num: number | null): string {
   if (num === null) return '—';
   return new Intl.NumberFormat('en-US').format(num);
 }
+
+/**
+ * Format duration in seconds as "Mm Ss" format
+ * @param durationSeconds The duration in seconds (can be null)
+ * @returns Formatted duration string
+ */
+export function formatDurationSeconds(durationSeconds: number | null): string {
+  if (durationSeconds === null || durationSeconds === undefined) return '—';
+
+  const minutes = Math.floor(durationSeconds / 60);
+  const seconds = durationSeconds % 60;
+
+  if (minutes > 0) {
+    return `${minutes}m ${seconds}s`;
+  } else {
+    return `${seconds}s`;
+  }
+}
