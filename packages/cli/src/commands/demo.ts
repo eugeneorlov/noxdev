@@ -103,6 +103,46 @@ async function runDemo(): Promise<void> {
   }
   console.log(chalk.green('✓ Docker image noxdev-runner:latest found'));
 
+  // Check if uv is installed
+  let uvOk = false;
+  try {
+    execSync("uv --version", {
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+    uvOk = true;
+  } catch (err: unknown) {
+    // uv not available or errored
+    dumpErr(err);
+  }
+
+  if (!uvOk) {
+    console.error(chalk.red('✖ uv not found.'));
+    console.error(chalk.yellow('  Install uv from: curl -LsSf https://astral.sh/uv/install.sh | sh'));
+    console.error(chalk.yellow('  Or visit: https://docs.astral.sh/uv/getting-started/installation/'));
+    process.exit(1);
+  }
+  console.log(chalk.green('✓ uv found'));
+
+  // Check if python3 is installed
+  let python3Ok = false;
+  try {
+    execSync("python3 --version", {
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+    python3Ok = true;
+  } catch (err: unknown) {
+    // python3 not available or errored
+    dumpErr(err);
+  }
+
+  if (!python3Ok) {
+    console.error(chalk.red('✖ python3 not found.'));
+    console.error(chalk.yellow('  Install Python 3.12+ from: https://www.python.org/downloads/'));
+    console.error(chalk.yellow('  Or use your system package manager (e.g., apt install python3, brew install python@3.12)'));
+    process.exit(1);
+  }
+  console.log(chalk.green('✓ python3 found'));
+
   // Step 2: Scaffold fullstack project
   console.log(chalk.bold('\nStep 2: Scaffolding fullstack React + FastAPI project'));
 
