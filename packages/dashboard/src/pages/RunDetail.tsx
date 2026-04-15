@@ -236,7 +236,7 @@ export default function RunDetail() {
                     {formatNumber(costData.input_tokens + costData.output_tokens)}
                   </div>
                   <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                    Total Tokens
+                    Tokens
                   </div>
                   <div className="text-xs text-gray-500 dark:text-gray-500 mt-1">
                     {costData.tasks_with_cost} tasks with cost data
