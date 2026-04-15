@@ -3,63 +3,79 @@
  */
 
 /**
- * Format a cost value as a currency string
+ * Unified cost formatting function with mode parameter
  * @param cost The cost value in USD (can be null)
- * @param precision Number of decimal places (default: 3)
- * @returns Formatted currency string (e.g., "$1.234", "$0.00")
+ * @param mode The formatting mode ('basic' | 'display' | 'props' | 'currency')
+ * @param options Formatting options
+ * @returns Formatted cost as string, props object, or null depending on mode
  */
-export function formatCost(cost: number | null, precision: number = 3): string {
-  if (cost === null || cost === 0) return '$0.00';
-  return `$${cost.toFixed(precision)}`;
-}
-
-/**
- * Format a cost value for display with auth mode context
- * @param cost The cost value in USD (can be null)
- * @param authModeValue The auth mode ('api' or 'max')
- * @param precision Number of decimal places (default: 4)
- * @returns Formatted string with context
- */
-export function formatCostDisplay(cost: number | null, authModeValue: string | null, precision: number = 4): string {
-  if (!cost) return '—';
-
-  const formattedCost = `$${cost.toFixed(precision)}`;
-  if (authModeValue === 'api') {
-    return `${formattedCost} (api)`;
-  } else if (authModeValue === 'max') {
-    return `${formattedCost} equivalent (max)`;
-  }
-  return formattedCost;
-}
-
-/**
- * Get cost formatting props for JSX elements
- * @param cost The cost value in USD (can be null)
- * @param authModeValue The auth mode ('api' or 'max')
- * @param precision Number of decimal places (default: 3)
- * @returns Object with text and styling props, or null if no cost to display
- */
-export function getCostProps(cost: number | null, authModeValue: string | null, precision: number = 3): {
-  text: string;
-  className: string;
-  title?: string;
-} | null {
-  if (!cost || cost === 0) return null;
-
-  if (authModeValue === 'api') {
-    return {
-      text: `$${cost.toFixed(precision)}`,
-      className: "text-xs font-mono text-gray-600 dark:text-gray-400"
-    };
-  } else if (authModeValue === 'max') {
-    return {
-      text: `$${cost.toFixed(precision)}*`,
-      className: "text-xs font-mono text-gray-500 dark:text-gray-500",
-      title: "Max equivalent API cost"
-    };
+export function formatCost(
+  cost: number | null,
+  mode: 'basic' | 'display' | 'props' | 'currency' = 'basic',
+  options: {
+    precision?: number;
+    authMode?: string | null;
+    minDecimals?: number;
+    maxDecimals?: number;
+  } = {}
+): string | { text: string; className: string; title?: string } | null {
+  // Handle null/zero cost based on mode
+  if (cost === null || cost === 0) {
+    switch (mode) {
+      case 'basic':
+        return '$0.00';
+      case 'display':
+        return '—';
+      case 'props':
+        return null;
+      case 'currency':
+        return '$0.00';
+    }
   }
 
-  return null;
+  const { precision = 3, authMode, minDecimals = 2, maxDecimals = 4 } = options;
+
+  switch (mode) {
+    case 'basic':
+      return `$${cost!.toFixed(precision)}`;
+
+    case 'display': {
+      const formattedCost = `$${cost!.toFixed(precision)}`;
+      if (authMode === 'api') {
+        return `${formattedCost} (api)`;
+      } else if (authMode === 'max') {
+        return `${formattedCost} equivalent (max)`;
+      }
+      return formattedCost;
+    }
+
+    case 'props': {
+      if (authMode === 'api') {
+        return {
+          text: `$${cost!.toFixed(precision)}`,
+          className: "text-xs font-mono text-gray-600 dark:text-gray-400"
+        };
+      } else if (authMode === 'max') {
+        return {
+          text: `$${cost!.toFixed(precision)}*`,
+          className: "text-xs font-mono text-gray-500 dark:text-gray-500",
+          title: "Max equivalent API cost"
+        };
+      }
+      return null;
+    }
+
+    case 'currency':
+      return new Intl.NumberFormat('en-US', {
+        minimumFractionDigits: minDecimals,
+        maximumFractionDigits: maxDecimals,
+        style: 'currency',
+        currency: 'USD',
+      }).format(cost!);
+
+    default:
+      return `$${cost!.toFixed(precision)}`;
+  }
 }
 
 /**
@@ -72,16 +88,3 @@ export function formatNumber(num: number | null): string {
   return new Intl.NumberFormat('en-US').format(num);
 }
 
-/**
- * Format cost using Intl.NumberFormat with flexible decimal places
- * @param cost The cost value in USD
- * @param minDecimals Minimum decimal places (default: 2)
- * @param maxDecimals Maximum decimal places (default: 4)
- * @returns Formatted currency string
- */
-export function formatCostIntl(cost: number, minDecimals: number = 2, maxDecimals: number = 4): string {
-  return new Intl.NumberFormat('en-US', {
-    minimumFractionDigits: minDecimals,
-    maximumFractionDigits: maxDecimals
-  }).format(cost);
-}

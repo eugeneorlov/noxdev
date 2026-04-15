@@ -1,4 +1,4 @@
-import { formatCostIntl } from '../lib/format';
+import { formatCost } from '../lib/format';
 
 interface CostSummaryData {
   tokens: {
@@ -67,7 +67,7 @@ export function CostSummary({ summary, loading }: CostSummaryProps) {
       <div className="grid grid-cols-4 gap-4">
         <div className="text-center">
           <div className="text-2xl font-bold text-green-600 dark:text-green-400">
-            ${formatCostIntl(summary.api.cost_usd)}
+            {formatCost(summary.api.cost_usd, 'currency')}
           </div>
           <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
             API Cost
@@ -79,7 +79,7 @@ export function CostSummary({ summary, loading }: CostSummaryProps) {
 
         <div className="text-center">
           <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">
-            ${formatCostIntl(summary.max.cost_usd_equivalent)}
+            {formatCost(summary.max.cost_usd_equivalent, 'currency')}
           </div>
           <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
             Max Equivalent Cost
@@ -91,7 +91,7 @@ export function CostSummary({ summary, loading }: CostSummaryProps) {
 
         <div className="text-center">
           <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
-            ${formatCostIntl(totalCost)}
+            {formatCost(totalCost, 'currency')}
           </div>
           <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
             Total

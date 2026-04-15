@@ -3,7 +3,7 @@ import { useApi } from '../hooks/useApi';
 import { StatusBadge } from '../components/StatusBadge';
 import { DiffViewer } from '../components/DiffViewer';
 import { useState } from 'react';
-import { formatCostDisplay, formatNumber } from '../lib/format';
+import { formatCost, formatNumber } from '../lib/format';
 
 interface TaskDetailData {
   id: number;
@@ -218,7 +218,7 @@ export default function TaskDetail() {
                 </div>
                 <div>
                   <span className="text-gray-600 dark:text-gray-400 block">Cost:</span>
-                  <span className="font-mono">{formatCostDisplay(task.cost_usd, task.auth_mode_cost)}</span>
+                  <span className="font-mono">{formatCost(task.cost_usd, 'display', { authMode: task.auth_mode_cost, precision: 4 })}</span>
                 </div>
               </div>
             ) : (

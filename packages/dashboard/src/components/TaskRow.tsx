@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { ChevronRight } from 'lucide-react';
 import { StatusBadge } from './StatusBadge';
 import { useApi } from '../hooks/useApi';
-import { getCostProps } from '../lib/format';
+import { formatCost } from '../lib/format';
 
 interface TaskResult {
   id: number;
@@ -85,7 +85,7 @@ export function TaskRow({ task, runId }: TaskRowProps) {
             {formatDuration(task.duration_seconds)}
           </span>
           {(() => {
-            const costProps = getCostProps(task.cost_usd, task.auth_mode_cost);
+            const costProps = formatCost(task.cost_usd, 'props', { authMode: task.auth_mode_cost });
             return costProps ? (
               <span className={costProps.className} title={costProps.title}>
                 {costProps.text}
