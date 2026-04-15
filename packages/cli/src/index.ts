@@ -14,6 +14,7 @@ import { registerSetup } from "./commands/setup.js";
 import { registerDemo } from "./commands/demo.js";
 import { registerCost } from "./commands/cost.js";
 
+
 const require = createRequire(import.meta.url);
 const { version } = require("../package.json");
 

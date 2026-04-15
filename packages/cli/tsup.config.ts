@@ -12,6 +12,6 @@ export default defineConfig({
   // built-in imports.  This breaks node:sqlite which has no unprefixed alias.
   removeNodeProtocol: false,
   banner: {
-    js: "#!/usr/bin/env node",
+    js: "#!/usr/bin/env -S node --no-warnings=ExperimentalWarning",
   },
 });

@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.1] - 2026-04-15
+   
+### Fixed
+- Suppress node:sqlite ExperimentalWarning. node:sqlite is a release candidate
+  in Node 24 (no flag needed) but still emits an experimental warning. The CLI
+  now starts with --no-warnings=ExperimentalWarning via shebang.
+- Build: tsup configured with removeNodeProtocol: false to preserve the
+  "node:" prefix on built-in module imports (was getting stripped, causing
+  ERR_MODULE_NOT_FOUND at runtime).
+- db/connection.ts: removed scope creep (mkdirSync, migrate call) introduced
+  during the v1.3.0 migration. Directory creation moved to db/index.ts where
+  it belongs.
+
 ## [1.3.0] - 2026-04-14
 
 ### Added
