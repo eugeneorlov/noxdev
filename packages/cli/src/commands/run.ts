@@ -123,9 +123,9 @@ async function runProject(project: ProjectRow): Promise<void> {
 }
 
 export async function runAllProjects(
-  db: Database.Database,
+  db: Database,
 ): Promise<void> {
-  const projects = getAllProjects(db) as ProjectRow[];
+  const projects = getAllProjects(db) as unknown as ProjectRow[];
   if (projects.length === 0) {
     console.log("No registered projects. Run `noxdev init` first.");
     return;
@@ -369,7 +369,7 @@ export function registerRun(program: Command): void {
             }
           } else {
             // No project specified — use the only one, or error if multiple
-            const projects = getAllProjects(db) as ProjectRow[];
+            const projects = getAllProjects(db) as unknown as ProjectRow[];
             if (projects.length === 0) {
               console.error(
                 chalk.red(

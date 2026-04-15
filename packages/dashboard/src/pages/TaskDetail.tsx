@@ -218,7 +218,7 @@ export default function TaskDetail() {
                 </div>
                 <div>
                   <span className="text-gray-600 dark:text-gray-400 block">Cost:</span>
-                  <span className="font-mono">{formatCost(task.cost_usd, 'display', { authMode: task.auth_mode_cost, precision: 4 })}</span>
+                  <span className="font-mono">{formatCost(task.cost_usd, 'display', { authMode: task.auth_mode_cost, precision: 4 }) as string}</span>
                 </div>
               </div>
             ) : (

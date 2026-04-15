@@ -2,6 +2,7 @@ import { DatabaseSync } from "node:sqlite";
 
 export interface OpenDbOptions {
   readonly?: boolean;
+  runMigrations?: boolean;
 }
 
 export type Database = import("node:sqlite").DatabaseSync;

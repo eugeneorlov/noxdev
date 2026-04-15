@@ -187,7 +187,7 @@ export function abortOrphanedRuns(db: Database): number {
      SET status = 'aborted', finished_at = datetime('now')
      WHERE status = 'running'`
   ).run();
-  return result.changes;
+  return Number(result.changes);
 }
 
 export function getRunCostBreakdown(db: Database, runId: string) {

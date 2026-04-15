@@ -11,7 +11,6 @@ function makeTask(overrides: Partial<ParsedTask> = {}): ParsedTask {
     files: ['src/auth.ts', 'src/routes/login.ts'],
     verify: 'pnpm test',
     critic: 'on',
-    push: 'off',
     spec: 'Implement JWT-based login endpoint.',
     ...overrides,
   };

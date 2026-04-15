@@ -65,7 +65,7 @@ export function registerProjects(program: Command): void {
              )
              ORDER BY p.display_name`,
           )
-          .all() as ProjectRow[];
+          .all() as unknown as ProjectRow[];
 
         if (rows.length === 0) {
           console.log(

@@ -95,7 +95,7 @@ export function loadGlobalConfig(): GlobalConfig {
   if (!overrides) {
     return { ...DEFAULT_GLOBAL_CONFIG };
   }
-  return deepMerge(DEFAULT_GLOBAL_CONFIG, overrides);
+  return deepMerge(DEFAULT_GLOBAL_CONFIG as unknown as Record<string, unknown>, overrides) as unknown as GlobalConfig;
 }
 
 export function loadProjectConfig(projectPath: string): ProjectConfig {
@@ -104,7 +104,7 @@ export function loadProjectConfig(projectPath: string): ProjectConfig {
   if (!overrides) {
     return { ...DEFAULT_PROJECT_CONFIG };
   }
-  return deepMerge(DEFAULT_PROJECT_CONFIG, overrides);
+  return deepMerge(DEFAULT_PROJECT_CONFIG as unknown as Record<string, unknown>, overrides) as unknown as ProjectConfig;
 }
 
 export type { GlobalConfig, ProjectConfig } from "./types.js";

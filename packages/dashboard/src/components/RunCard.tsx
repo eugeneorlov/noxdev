@@ -76,7 +76,7 @@ export function RunCard({ project }: RunCardProps) {
           {(project.total_cost_tasks || 0) > 0 && (
             <div className="flex items-center gap-4 text-sm mt-1">
               <span className="text-blue-600 dark:text-blue-400">
-                {formatCost((project.api_cost_usd || 0) + (project.max_cost_usd_equivalent || 0), 'basic', { precision: 3 })} All-time cost
+                {formatCost((project.api_cost_usd || 0) + (project.max_cost_usd_equivalent || 0), 'basic', { precision: 3 }) as string} All-time cost
               </span>
               <span className="text-gray-500 dark:text-gray-400">
                 {project.total_cost_tasks || 0} cost tasks

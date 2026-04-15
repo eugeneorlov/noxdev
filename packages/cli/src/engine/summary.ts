@@ -32,7 +32,7 @@ interface RunRow {
 }
 
 export function getAllProjectSummaries(db: Database): ProjectSummary[] {
-  const projects = getAllProjects(db) as ProjectRow[];
+  const projects = getAllProjects(db) as unknown as ProjectRow[];
   const summaries: ProjectSummary[] = [];
 
   for (const p of projects) {

@@ -85,7 +85,7 @@ export function TaskRow({ task, runId }: TaskRowProps) {
             {formatDuration(task.duration_seconds)}
           </span>
           {(() => {
-            const costProps = formatCost(task.cost_usd, 'props', { authMode: task.auth_mode_cost });
+            const costProps = formatCost(task.cost_usd, 'props', { authMode: task.auth_mode_cost }) as { text: string; className: string; title?: string } | null;
             return costProps ? (
               <span className={costProps.className} title={costProps.title}>
                 {costProps.text}

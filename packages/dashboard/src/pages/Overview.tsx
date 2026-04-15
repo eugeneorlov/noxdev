@@ -1,6 +1,6 @@
 import { useApi } from '../hooks/useApi';
 import { RunCard } from '../components/RunCard';
-import { CostSummary } from '../components/CostSummary';
+import { CostSummary, type CostSummaryData } from '../components/CostSummary';
 
 interface Project {
   id: string;
@@ -16,7 +16,7 @@ interface Project {
 
 export default function Overview() {
   const { data: projects, loading, error } = useApi<Project[]>('/api/projects');
-  const { data: costSummary, loading: costLoading } = useApi('/api/cost/summary');
+  const { data: costSummary, loading: costLoading } = useApi<CostSummaryData>('/api/cost/summary');
 
   const getCurrentDate = (): string => {
     return new Date().toLocaleDateString('en-US', {
@@ -99,7 +99,7 @@ export default function Overview() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {projects.map((project) => (
+          {projects?.map((project) => (
             <RunCard key={project.id} project={project} />
           ))}
         </div>

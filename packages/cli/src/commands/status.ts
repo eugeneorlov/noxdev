@@ -77,7 +77,7 @@ function statusBadge(status: string): string {
   }
 }
 
-function getRunCost(db: Database.Database, runId: string): RunCostRow | null {
+function getRunCost(db: Database, runId: string): RunCostRow | null {
   return db.prepare(`
     SELECT
       SUM(CASE WHEN auth_mode_cost = 'api' THEN cost_usd ELSE 0 END) as api_cost,
@@ -86,7 +86,7 @@ function getRunCost(db: Database.Database, runId: string): RunCostRow | null {
       SUM(output_tokens) as output_tokens
     FROM task_results
     WHERE run_id = ? AND model IS NOT NULL
-  `).get(runId) as RunCostRow | null;
+  `).get(runId) as unknown as RunCostRow | null;
 }
 
 
@@ -101,7 +101,7 @@ function formatTokens(tokens: number | null): string {
   return String(tokens);
 }
 
-export function showProjectStatus(db: Database.Database, projectId: string): void {
+export function showProjectStatus(db: Database, projectId: string): void {
   const project = getProject(db, projectId) as ProjectRow | null;
   if (!project) {
     console.log(chalk.red(`Project not found: ${projectId}`));
@@ -114,7 +114,7 @@ export function showProjectStatus(db: Database.Database, projectId: string): voi
     return;
   }
 
-  const tasks = getTaskResults(db, run.id) as TaskResultRow[];
+  const tasks = getTaskResults(db, run.id) as unknown as TaskResultRow[];
   const timeStr = relativeTime(run.started_at);
 
   console.log(`noxdev status: ${chalk.bold(project.display_name)}`);
@@ -184,7 +184,7 @@ export function registerStatus(program: Command): void {
           return;
         }
 
-        const projects = getAllProjects(db) as ProjectRow[];
+        const projects = getAllProjects(db) as unknown as ProjectRow[];
         if (projects.length === 0) {
           console.log("No projects registered. Run: noxdev init <project> --repo <path>");
           return;

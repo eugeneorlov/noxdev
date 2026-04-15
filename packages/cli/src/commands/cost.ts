@@ -150,7 +150,7 @@ function formatTotalTokens(input: number | null, output: number | null): string 
   return `${Math.round(total / 1000000)}M`;
 }
 
-function getCostData(db: Database.Database, projectId: string | null, sinceDate: string): CostRow[] | TotalCostRow {
+function getCostData(db: Database, projectId: string | null, sinceDate: string): CostRow[] | TotalCostRow {
   const whereClause = projectId
     ? `WHERE r.project_id = ? AND (tr.started_at IS NULL OR tr.started_at >= ?)`
     : `WHERE (tr.started_at IS NULL OR tr.started_at >= ?)`;
@@ -219,7 +219,7 @@ function getCostData(db: Database.Database, projectId: string | null, sinceDate:
   }
 }
 
-function getPerProjectCostData(db: Database.Database, sinceDate: string): CostRow[] {
+function getPerProjectCostData(db: Database, sinceDate: string): CostRow[] {
   const results = db.prepare(`
     SELECT
       r.project_id,
@@ -238,12 +238,12 @@ function getPerProjectCostData(db: Database.Database, sinceDate: string): CostRo
       AND tr.model IS NOT NULL
     GROUP BY r.project_id, p.display_name
     ORDER BY p.display_name
-  `).all(sinceDate) as CostRow[];
+  `).all(sinceDate) as unknown as CostRow[];
 
   return results;
 }
 
-function getOlderTasksCount(db: Database.Database, sinceDate: string): number {
+function getOlderTasksCount(db: Database, sinceDate: string): number {
   const result = db.prepare(`
     SELECT COUNT(*) as count
     FROM task_results tr
@@ -353,7 +353,7 @@ export function registerCost(program: Command): void {
         // Priority order: --run > --global > project arg > default (per-project)
         if (opts.run) {
           // Per-task breakdown for specific run
-          const tasks = getPerTaskCostData(db, opts.run) as TaskRow[];
+          const tasks = getPerTaskCostData(db, opts.run) as unknown as TaskRow[];
           renderPerTaskTable(tasks, opts.run);
 
         } else if (opts.global) {
@@ -398,8 +398,8 @@ export function registerCost(program: Command): void {
             return;
           }
 
-          const runs = getPerRunCostData(db, project, sinceDate) as RunRow[];
-          renderPerRunTable(runs, projectData.display_name, formatSinceRange(opts.since));
+          const runs = getPerRunCostData(db, project, sinceDate) as unknown as RunRow[];
+          renderPerRunTable(runs, String(projectData.display_name), formatSinceRange(opts.since));
 
         } else {
           // Default: per-project breakdown (current --all behavior)
