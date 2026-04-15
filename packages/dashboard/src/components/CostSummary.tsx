@@ -39,7 +39,8 @@ export function CostSummary({ summary, loading }: CostSummaryProps) {
       <div className="rounded-lg border p-4 mb-6">
         <div className="animate-pulse">
           <div className="h-6 bg-gray-200 rounded mb-4"></div>
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-4 gap-4">
+            <div className="h-16 bg-gray-200 rounded"></div>
             <div className="h-16 bg-gray-200 rounded"></div>
             <div className="h-16 bg-gray-200 rounded"></div>
             <div className="h-16 bg-gray-200 rounded"></div>
@@ -63,7 +64,7 @@ export function CostSummary({ summary, loading }: CostSummaryProps) {
         Cost Summary
       </h2>
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-4 gap-4">
         <div className="text-center">
           <div className="text-2xl font-bold text-green-600 dark:text-green-400">
             ${formatCostIntl(summary.api.cost_usd)}
@@ -85,6 +86,18 @@ export function CostSummary({ summary, loading }: CostSummaryProps) {
           </div>
           <div className="text-xs text-gray-500 dark:text-gray-500 mt-1">
             {summary.max.tasks} tasks
+          </div>
+        </div>
+
+        <div className="text-center">
+          <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+            ${formatCostIntl(totalCost)}
+          </div>
+          <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+            Total
+          </div>
+          <div className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+            API + Max equivalent
           </div>
         </div>
 

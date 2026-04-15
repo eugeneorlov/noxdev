@@ -27,7 +27,6 @@ function isoNow(): string {
 }
 
 function captureTaskCost(
-  worktreePath: string,
   containerStartMs: number,
   authMode: string,
 ): {
@@ -357,7 +356,7 @@ async function executeTask(
   const finishedAt = isoNow();
 
   // Capture token usage and cost from the Claude Code session JSONL
-  const costData = captureTaskCost(ctx.worktreeDir, containerStartMs, ctx.auth.mode);
+  const costData = captureTaskCost(containerStartMs, ctx.auth.mode);
 
   // Insert task result into SQLite
   insertTaskResult(ctx.db, {
