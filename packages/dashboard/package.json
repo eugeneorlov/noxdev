@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build && pnpm run build:api",
     "preview": "vite preview",
-    "build:api": "tsup src/api/server.ts --format esm --target node18 --outDir dist/api",
+    "build:api": "tsup",
     "start:api": "node dist/api/server.js"
   },
   "dependencies": {
