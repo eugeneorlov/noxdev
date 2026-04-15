@@ -101,7 +101,7 @@ Safety layers include Docker containment, worktree isolation, and critic agent r
 | `noxdev run --overnight` | Unattended mode with extended timeouts |
 | `noxdev status <project>` | Show project status and recent execution summary |
 | `noxdev log <project>` | View detailed execution history and logs |
-| `noxdev cost [project]` | Token usage and cost summary (global or per-project) |
+| `noxdev cost [project]` | Token usage and cost summary with per-project breakdown (or per-run for specific project) |
 | `noxdev projects` | List all registered projects |
 | `noxdev dashboard` | Launch web UI for visual review (localhost only) |
 | `noxdev doctor` | Check prerequisites and system health |
@@ -112,12 +112,12 @@ A React web interface for reviewing overnight work. Run `noxdev dashboard` to st
 
 ## Cost tracking
 
-noxdev captures token usage and cost per task from Claude Code session logs. The `noxdev cost` command provides detailed breakdowns of API consumption across all your autonomous coding work.
+noxdev captures token usage and cost per task from Claude Code session logs. The `noxdev cost` command provides detailed per-project breakdowns of API consumption across all your autonomous coding work, with options for per-run and per-task analysis.
 
-Example output of `noxdev cost --all`:
+Example output of `noxdev cost` (per-project breakdown):
 
 ```bash
-$ noxdev cost --all
+$ noxdev cost
 
 === Token Usage & Cost Summary ===
 Total projects: 3
@@ -148,6 +148,12 @@ Actual Max usage is flat-rate - this number helps track consumption.
 ```
 
 The **Max-equivalent cost** shows what this usage would have cost via API. Since actual Max usage is flat-rate, the dollar amount is for reference only - it helps you understand the scale of your consumption.
+
+**Cost analysis options:**
+- `noxdev cost` — per-project breakdown (default)
+- `noxdev cost my-project` — per-run breakdown for specific project 
+- `noxdev cost --run <run-id>` — per-task breakdown for specific run
+- `noxdev cost --global` — global totals across all projects
 
 You can override pricing rates by creating `~/.noxdev/pricing.json`:
 
