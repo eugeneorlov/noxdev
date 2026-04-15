@@ -1,412 +1,72 @@
-# Cost display restructure — projects → runs → tasks hierarchy
+# Cost display Round A — cleanup, bug fixes, rename, TypeScript health
 
-# Source audits (read into Project before planning the next round):
-#   .audits/audit-cost-display-2026-04-15-v0.md
-#   .audits/audit-cost-capture-postfix-2026-04-15.md
-#
-# Premise: v1.3.2 fixed cost CAPTURE. This TASKS.md fixes cost DISPLAY — the
-# missing per-project and per-run views. After this work lands, the user can
-# answer:
-#   - Which projects are eating budget? (Overview cost stat per project card)
-#   - What did this work session cost? (RunDetail rollup)
-#   - Was any single task expensive? (drill-down via existing TaskDetail)
-#   - Am I leaning too much on API vs Max? (split visible at every level)
-#
-# UX hierarchy after this work:
-#   Overview              → all projects, totals, project cards with cost stat
-#     Project view (NEW)  → project totals + runs table, click-through per run
-#       Run Detail        → run rollup + task rows with cost column
-#         Task Detail     → existing per-task cost section (unchanged)
-#
-# CRITICAL DATA-MODEL CONSTRAINT (encode in every relevant spec):
-#   task_id values are NOT unique across runs. Every TASKS.md reuses T1, T2, ...
-#   NEVER aggregate by task_id at project or global level. Always GROUP BY run_id,
-#   then drill down to tasks within a single run.
-#
-# Dependencies: clean main at v1.3.2 published. Capture validated working
-#   (one fresh run produces a row with non-null model and cost_usd > 0)
-#   BEFORE merging any of this — otherwise the display is built on an
-#   unverified foundation. The display CODE is independent of capture state,
-#   but visual sanity checks during development require real data.
-#
-# Gate: pnpm build && pnpm test pass; noxdev dashboard renders Project view
-#   with runs table; noxdev cost defaults to per-project breakdown.
-#
-# CRITIC: skip on all tasks. Verification done via post-run audit comparing
-# actual diffs against this TASKS.md.
+# Audit: .audits/audit-cost-display-v2-2026-04-15.md
+# Round B (project-page redesign with flat task table) waits for Round A audit-after.
 
-## T1: per-run cost query + /api/cost/runs/:runId endpoint
+## T1: Flatten /api/cost/runs/:runId response and wire dead query function
 - STATUS: done
-- FILES: packages/cli/src/db/queries.ts, packages/dashboard/src/api/routes/cost.ts
-- VERIFY: cd packages/cli && pnpm build && cd ../dashboard && pnpm build && grep -q "getRunCostBreakdown\|getRunCost" packages/cli/dist/db/queries.js && grep -q "/runs/:runId\|/runs/:run_id" packages/dashboard/dist/api/server.js
+- FILES: packages/dashboard/src/api/routes/cost.ts, packages/dashboard/src/pages/RunDetail.tsx, packages/cli/src/db/queries.ts
+- VERIFY: cd packages/dashboard && pnpm build && grep -q "api_cost_usd" packages/dashboard/dist/api/server.js && grep -q "max_cost_usd_equivalent" packages/dashboard/dist/api/server.js && grep -q "tasks_with_cost" packages/dashboard/dist/api/server.js && cd ../cli && pnpm build && grep -q "getRunCostBreakdown" packages/cli/dist/db/queries.js
 - CRITIC: skip
-- SPEC:
-  Foundation for RunDetail cost rollup (T5) and consumed by Project view runs
-  table (T6).
+- SPEC: RunDetail shows $NaN on all three cost cards because the API returns
+  nested `{ tokens: { input }, api: { cost_usd }, max: { cost_usd_equivalent } }`
+  but the RunCostBreakdown TS interface declares flat fields. Component reads
+  `costData.api_cost_usd` → undefined → $NaN. See audit RISK 1.
 
-  Step 1 — In packages/cli/src/db/queries.ts, add a query function:
-  getRunCostBreakdown(db, runId) returning a single row:
+  Decision: flatten the API to match the component. Single source of truth via
+  the dead getRunCostBreakdown query function.
+
+  Step 1 — Update getRunCostBreakdown in packages/cli/src/db/queries.ts (audit
+  located it at lines 193-210). Return type and SQL must produce this exact
+  flat shape:
+  ```
   {
-    run_id: string,
-    total_tasks: number,
-    tasks_with_cost: number,           // count where model IS NOT NULL
-    input_tokens: number,
-    output_tokens: number,
-    cache_read_tokens: number,
-    cache_write_tokens: number,
-    api_tasks: number,                 // count where auth_mode_cost = 'api'
-    api_cost_usd: number,
-    max_tasks: number,                 // count where auth_mode_cost = 'max'
-    max_cost_usd_equivalent: number
+    run_id, total_tasks, tasks_with_cost,
+    earliest_started_at, latest_finished_at,
+    input_tokens, output_tokens, cache_read_tokens, cache_write_tokens,
+    api_tasks, api_cost_usd,
+    max_tasks, max_cost_usd_equivalent
   }
-
-  Query pattern (match existing style in cost.ts:83-100):
-  ```sql
-  SELECT
-    r.id as run_id,
-    COUNT(*) as total_tasks,
-    SUM(CASE WHEN tr.model IS NOT NULL THEN 1 ELSE 0 END) as tasks_with_cost,
-    COALESCE(SUM(tr.input_tokens), 0) as input_tokens,
-    COALESCE(SUM(tr.output_tokens), 0) as output_tokens,
-    COALESCE(SUM(tr.cache_read_tokens), 0) as cache_read_tokens,
-    COALESCE(SUM(tr.cache_write_tokens), 0) as cache_write_tokens,
-    SUM(CASE WHEN tr.auth_mode_cost = 'api' THEN 1 ELSE 0 END) as api_tasks,
-    COALESCE(SUM(CASE WHEN tr.auth_mode_cost = 'api' THEN tr.cost_usd ELSE 0 END), 0) as api_cost_usd,
-    SUM(CASE WHEN tr.auth_mode_cost = 'max' THEN 1 ELSE 0 END) as max_tasks,
-    COALESCE(SUM(CASE WHEN tr.auth_mode_cost = 'max' THEN tr.cost_usd ELSE 0 END), 0) as max_cost_usd_equivalent
-  FROM task_results tr
-  JOIN runs r ON tr.run_id = r.id
-  WHERE r.id = ?
-  GROUP BY r.id
   ```
+  tasks_with_cost = `SUM(CASE WHEN tr.model IS NOT NULL THEN 1 ELSE 0 END)`.
 
-  Note: NO `AND model IS NOT NULL` filter at the top level — we want to count
-  all tasks in the run (including those without cost data) so the "tasks with
-  cost / total tasks" ratio is visible.
+  Step 2 — In packages/dashboard/src/api/routes/cost.ts find the
+  /api/cost/runs/:runId handler (audit located at lines 247-302). Delete the
+  inline SQL. Import getRunCostBreakdown from the cli package. Call it,
+  return its result directly. The route becomes a thin wrapper.
 
-  Step 2 — In packages/dashboard/src/api/routes/cost.ts add endpoint:
-  GET /api/cost/runs/:runId
-  Returns the single object from getRunCostBreakdown.
-  404 if run not found.
+  Step 3 — In packages/dashboard/src/pages/RunDetail.tsx the existing
+  RunCostBreakdown interface at lines 45-57 already declares the flat shape.
+  Verify it matches. The component code reading `costData.api_cost_usd` etc.
+  now resolves correctly.
 
-  Match existing route patterns in the same file. Use the same try/catch +
-  500 error handling.
+  The line 220 guard `costData.tasks_with_cost === 0` now triggers when no
+  tasks have model — the "no cost data" warning shows instead of NaN cards.
 
-  Do NOT modify cost.ts CLI command (separate task).
-  Do NOT modify any existing query.
+  Do NOT change /api/cost/summary or /api/cost/projects routes. Those have
+  their own consumers and aren't broken.
 
-## T2: per-project detail endpoint + per-run rows
+## T2: Unify formatCost — single API with mode parameter, delete all alternatives
 - STATUS: done
-- FILES: packages/dashboard/src/api/routes/cost.ts
-- VERIFY: cd packages/dashboard && pnpm build && grep -q "/projects/:projectId\|/projects/:project_id" packages/dashboard/dist/api/server.js && grep -q "runs" packages/dashboard/dist/api/server.js
+- FILES: packages/cli/src/lib/format.ts, packages/dashboard/src/lib/format.ts, packages/cli/src/commands/cost.ts, packages/cli/src/commands/status.ts, packages/cli/src/commands/log.ts, packages/dashboard/src/components/TaskRow.tsx, packages/dashboard/src/components/CostSummary.tsx, packages/dashboard/src/pages/TaskDetail.tsx, packages/dashboard/src/pages/RunDetail.tsx, packages/dashboard/src/components/RunCard.tsx
+- VERIFY: cd packages/cli && pnpm build && cd ../dashboard && pnpm build && ! grep -rE "function formatCost|const formatCost\s*=" packages/cli/src/commands/ packages/dashboard/src/components/ packages/dashboard/src/pages/ && ! grep -r "formatCostDisplay\|getCostProps\|formatCostIntl" packages/dashboard/src/ && ! grep -rE "\.toFixed\(3\)|\.toFixed\(4\)" packages/dashboard/src/components/ packages/dashboard/src/pages/
 - CRITIC: skip
-- SPEC:
-  Backend for the new ProjectView page (T6).
+- SPEC: Previous round's T7 marked done but shipped to a different spec. Five
+  formatting approaches coexist in the dashboard: formatCost, formatCostDisplay,
+  getCostProps, formatCostIntl, raw .toFixed(3), inline Intl. Dashboard
+  formatCost is dead code (exported, never imported). RunCard uses raw
+  .toFixed(3). See audit RISK 2 + Section 4.
 
-  In packages/dashboard/src/api/routes/cost.ts add:
-  GET /api/cost/projects/:projectId
+  Replace ALL of them with one API. The VERIFY gate has multiple negative
+  greps that fail if any old formatter name remains anywhere it shouldn't.
 
-  Returns:
-  {
-    project: { id, display_name, repo_path },
-    totals: {
-      total_runs: number,
-      total_tasks: number,
-      tasks_with_cost: number,
-      input_tokens, output_tokens, cache_read_tokens, cache_write_tokens,
-      api_tasks, api_cost_usd,
-      max_tasks, max_cost_usd_equivalent
-    },
-    runs: [
-      {
-        run_id: string,
-        started_at: string,
-        finished_at: string | null,
-        duration_seconds: number | null,
-        auth_mode: string,
-        status: string,
-        total_tasks: number,
-        tasks_with_cost: number,
-        api_cost_usd: number,
-        max_cost_usd_equivalent: number,
-        total_cost_usd: number  // api + max
-      },
-      ...
-    ]
-  }
-
-  runs array sorted by started_at DESC (newest first).
-  404 if project not found.
-
-  Implementation: two queries.
-
-  Query 1 — project totals (one row):
-  ```sql
-  SELECT
-    p.id, p.display_name, p.repo_path,
-    COUNT(DISTINCT r.id) as total_runs,
-    COUNT(tr.id) as total_tasks,
-    SUM(CASE WHEN tr.model IS NOT NULL THEN 1 ELSE 0 END) as tasks_with_cost,
-    COALESCE(SUM(tr.input_tokens), 0) as input_tokens,
-    COALESCE(SUM(tr.output_tokens), 0) as output_tokens,
-    COALESCE(SUM(tr.cache_read_tokens), 0) as cache_read_tokens,
-    COALESCE(SUM(tr.cache_write_tokens), 0) as cache_write_tokens,
-    SUM(CASE WHEN tr.auth_mode_cost = 'api' THEN 1 ELSE 0 END) as api_tasks,
-    COALESCE(SUM(CASE WHEN tr.auth_mode_cost = 'api' THEN tr.cost_usd ELSE 0 END), 0) as api_cost_usd,
-    SUM(CASE WHEN tr.auth_mode_cost = 'max' THEN 1 ELSE 0 END) as max_tasks,
-    COALESCE(SUM(CASE WHEN tr.auth_mode_cost = 'max' THEN tr.cost_usd ELSE 0 END), 0) as max_cost_usd_equivalent
-  FROM projects p
-  LEFT JOIN runs r ON r.project_id = p.id
-  LEFT JOIN task_results tr ON tr.run_id = r.id
-  WHERE p.id = ?
-  GROUP BY p.id, p.display_name, p.repo_path
+  Step 1 — Replace packages/cli/src/lib/format.ts entire contents with:
   ```
-
-  Query 2 — per-run rows (multi-row, GROUP BY run):
-  ```sql
-  SELECT
-    r.id as run_id,
-    r.started_at, r.finished_at, r.duration_seconds,
-    r.auth_mode, r.status,
-    COUNT(tr.id) as total_tasks,
-    SUM(CASE WHEN tr.model IS NOT NULL THEN 1 ELSE 0 END) as tasks_with_cost,
-    COALESCE(SUM(CASE WHEN tr.auth_mode_cost = 'api' THEN tr.cost_usd ELSE 0 END), 0) as api_cost_usd,
-    COALESCE(SUM(CASE WHEN tr.auth_mode_cost = 'max' THEN tr.cost_usd ELSE 0 END), 0) as max_cost_usd_equivalent,
-    COALESCE(SUM(tr.cost_usd), 0) as total_cost_usd
-  FROM runs r
-  LEFT JOIN task_results tr ON tr.run_id = r.id
-  WHERE r.project_id = ?
-  GROUP BY r.id, r.started_at, r.finished_at, r.duration_seconds, r.auth_mode, r.status
-  ORDER BY r.started_at DESC
-  ```
-
-  IMPORTANT: GROUP BY run_id (not task_id). Task IDs are reused across runs
-  and are not unique at project level — aggregating by task_id would silently
-  collapse different tasks together.
-
-  Match existing route patterns in the same file. Use the same try/catch.
-
-  Do NOT modify other routes.
-
-## T3: Overview project cards — add cost stat per project
-- STATUS: done
-- FILES: packages/dashboard/src/api/routes/projects.ts, packages/dashboard/src/components/RunCard.tsx
-- VERIFY: cd packages/dashboard && pnpm build && grep -q "cost_usd\|total_cost" packages/dashboard/dist/api/server.js && grep -q "cost\|Cost" packages/dashboard/dist/assets/*.js
-- CRITIC: skip
-- SPEC:
-  Each project card on the Overview page should show a small cost stat so the
-  user can see at a glance which projects are accumulating cost.
-
-  Step 1 — In packages/dashboard/src/api/routes/projects.ts (the existing
-  endpoint that powers Overview project cards), add cost fields to the
-  returned per-project object:
-    total_cost_usd: number      // api + max equivalent across all this project's runs
-    total_runs: number          // count of runs for this project
-
-  Modify the existing query to LEFT JOIN task_results and SUM cost_usd,
-  COUNT(DISTINCT runs.id). Do not break existing fields.
-
-  Step 2 — In packages/dashboard/src/components/RunCard.tsx (the project
-  card component used on Overview), add a small line near the bottom of the
-  card showing:
-    "$X.XX • N runs"  (where $X.XX is total_cost_usd, N is total_runs)
-
-  If total_cost_usd is 0 AND there are runs, show:
-    "no cost data • N runs"  (distinguish from "$0.00 • N runs")
-
-  If there are zero runs, show nothing additional (the existing "No runs
-  yet" placeholder stays).
-
-  Use the same Tailwind class vocabulary as the rest of the card. Make this
-  the smallest text style on the card — it's a glanceable stat, not a
-  headline.
-
-  Do NOT modify the rest of RunCard. Do NOT modify Overview.tsx beyond what
-  prop type changes require.
-
-## T4: Implement ProjectView page + add /projects/:id route
-- STATUS: done
-- FILES: packages/dashboard/src/pages/ProjectView.tsx, packages/dashboard/src/App.tsx
-- VERIFY: cd packages/dashboard && pnpm build && grep -q "ProjectView\|projectId" packages/dashboard/dist/assets/*.js && grep -q "/projects/" packages/dashboard/dist/assets/*.js
-- CRITIC: skip
-- SPEC:
-  Replace the placeholder ProjectView with a real page showing project totals
-  and a runs table. This is the headline UX of this release.
-
-  Step 1 — In packages/dashboard/src/App.tsx add a route:
-    /projects/:projectId  →  <ProjectView />
-
-  Add it next to the existing routes. Pattern matches the existing
-  /runs/:runId route.
-
-  Step 2 — In packages/dashboard/src/pages/ProjectView.tsx replace the
-  placeholder content. Use useParams() to get projectId. Use useApi() (the
-  existing hook) to fetch GET /api/cost/projects/:projectId.
-
-  Layout (top to bottom):
-
-  Header:
-    - Back link: "← Back to Overview"
-    - h1: project display_name
-    - Subtitle: repo_path in muted/mono text
-    - Status row: total_runs, total_tasks ("N tasks across M runs")
-
-  Project totals card (use same visual language as CostSummary on Overview):
-    Three cards in a row:
-      "API Cost" (green)        — $X.XX, "N tasks" subtitle
-      "Max Equivalent" (orange) — $X.XX, "N tasks" subtitle
-      "Total Tokens" (blue)     — compact M/K, "N tasks with cost data" subtitle
-
-    If totals.tasks_with_cost === 0 AND totals.total_tasks > 0, show a banner
-    above the cards:
-      "No cost data captured yet — runs from before v1.3.2 do not have token data."
-
-  Runs table (the new core view):
-    Columns: Date | Run ID | Tasks | Duration | API $ | Max $ (equiv) | Total
-    Each row clickable, navigates to /runs/:runId
-    Sort: started_at DESC by default
-    Status badge inline with the run ID (use existing StatusBadge component)
-    Format date/time consistently with RunDetail page
-    Format tasks as "M/N" where M = tasks_with_cost, N = total_tasks
-      (so user can see at a glance "8/8" = full coverage, "0/12" = no data)
-    Format costs: use the unified formatCost (T8) — 2 decimals here
-
-  Empty states:
-    - Zero runs: "No runs yet for this project. Run: noxdev run <project>"
-    - Project not found (404 from API): "Project not found. ← Back to Overview"
-
-  Use the same Tailwind/shadcn-style vocabulary as Overview and RunDetail.
-  Match the existing site visual language exactly — do not invent new
-  components when existing ones (StatusBadge, card patterns) work.
-
-  Do NOT add expand-to-show-tasks UX for this release — clicking a run row
-  navigates to RunDetail which has the per-task breakdown (T5). Simpler scope.
-
-## T5: RunDetail — add cost rollup header + cost column on task rows
-- STATUS: done
-- FILES: packages/dashboard/src/pages/RunDetail.tsx, packages/dashboard/src/components/TaskRow.tsx
-- VERIFY: cd packages/dashboard && pnpm build && grep -q "cost\|Cost" packages/dashboard/dist/assets/*.js
-- CRITIC: skip
-- SPEC:
-  RunDetail currently has zero cost references (per audit). Add:
-
-  Step 1 — In packages/dashboard/src/pages/RunDetail.tsx, fetch cost data for
-  this run alongside the existing task data:
-    useApi('/api/cost/runs/' + runId)  → returns getRunCostBreakdown shape (see T1)
-
-  Step 2 — Add a cost rollup section to the run header, between the existing
-  metadata (started/finished/auth mode) and the task list. Three-card layout
-  matching CostSummary visual style:
-    "API Cost" (green)        — $X.XX from api_cost_usd, "N tasks" subtitle
-    "Max Equivalent" (orange) — $X.XX from max_cost_usd_equivalent, "N tasks"
-    "Total Tokens" (blue)     — compact M/K of input + output
-
-  If tasks_with_cost === 0 AND total_tasks > 0, replace the cards with a
-  single muted banner:
-    "No cost data captured for this run."
-
-  Step 3 — TaskRow already has cost rendering (audit confirms TaskRow.tsx:108
-  renders formatCost). Verify it still renders correctly with real data after
-  T8's formatCost unification — no functional changes needed here unless
-  T8 changes the import path.
-
-  Do NOT modify the existing task list / status badge / progress bar.
-  Do NOT change task expand/collapse behavior.
-
-## T6: Restructure noxdev cost CLI
-- STATUS: done
-- FILES: packages/cli/src/commands/cost.ts
-- VERIFY: cd packages/cli && pnpm build && grep -q "per-project\|projects" packages/cli/dist/commands/cost.js && grep -q "\\-\\-run\|run_id" packages/cli/dist/commands/cost.js
-- CRITIC: skip
-- SPEC:
-  Current behavior:
-    noxdev cost           → global totals (one summary)
-    noxdev cost <project> → single-project totals (one summary)
-    noxdev cost --all     → per-project breakdown table
-
-  Desired behavior (mirrors dashboard hierarchy):
-    noxdev cost                   → per-project breakdown table (current --all)
-    noxdev cost <project>         → per-run breakdown table for that project
-    noxdev cost --run <run-id>    → per-task breakdown for that run
-    noxdev cost --all             → still works (alias for default behavior — backwards compat)
-    noxdev cost --global          → NEW: explicit global totals (old default)
-
-  Why: the previous default (global totals) answered the least useful question
-  and required --all to get the actually-useful per-project view. Per-project
-  is the natural default.
-
-  Step 1 — Add new query function getPerRunCostData(db, projectId, sinceDate)
-  matching the shape of T2's runs array (returns per-run rows for one project).
-  If projectId is null, no rows. (--run uses T1's getRunCostBreakdown via a
-  different code path — single run, not project-scoped.)
-
-  Step 2 — Add per-run table renderer:
-    Header: "RUN ID                 STARTED    TASKS    DURATION    $API     $MAX-EQ   $TOTAL"
-    Each row: run_id, formatted started_at (date + time), tasks "M/N",
-    duration formatted, costs.
-    Total footer row.
-
-  Step 3 — Add per-task table renderer for --run:
-    Header: "TASK    STATUS    DURATION    MODEL                 TOKENS         $COST"
-    Each row: task_id, status, duration, truncated model name, total tokens,
-    cost_usd.
-    Total footer row.
-
-  Step 4 — Restructure the command flow:
-    - Default (no project, no --run, no --global, no --all): per-project table
-    - With <project> arg, no --run: per-run table for that project
-    - With --run <id>: per-task table for that run, ignore project arg
-    - With --global: old global-totals view (the current no-args output)
-    - With --all: same as default (per-project table)
-
-  Step 5 — All renderers must use the unified formatCost from T8 (consistent
-  precision across CLI commands).
-
-  Step 6 — Null handling: when tasks_with_cost === 0 but total_tasks > 0,
-  show a one-line note above the table:
-    "Note: N tasks have no cost data captured (broken capture pre-v1.3.2 or
-     model field is null)."
-  Keep the existing "No cost data found" message for genuinely empty result
-  sets.
-
-  CRITICAL: Per-project and per-run aggregations must GROUP BY project_id or
-  run_id respectively. NEVER aggregate by task_id at any level above
-  per-task — task IDs are reused across runs and TASKS.md files. Aggregating
-  by task_id would silently collapse different tasks.
-
-  Preserve --since flag behavior on all variants. Preserve existing
-  formatNumber helper. Existing types CostRow / TotalCostRow stay; add new
-  PerRunCostRow and PerTaskCostRow types as needed.
-
-  Do NOT remove the existing query functions even if some become unused —
-  some are still called by status.ts.
-
-## T7: Unify formatCost across CLI and dashboard
-- STATUS: done
-- FILES: packages/cli/src/lib/format.ts, packages/cli/src/commands/cost.ts, packages/cli/src/commands/status.ts, packages/cli/src/commands/log.ts, packages/dashboard/src/lib/format.ts, packages/dashboard/src/components/TaskRow.tsx, packages/dashboard/src/components/CostSummary.tsx, packages/dashboard/src/pages/TaskDetail.tsx
-- VERIFY: cd packages/cli && pnpm build && cd ../dashboard && pnpm build && grep -c "function formatCost" packages/cli/src/commands/cost.ts packages/cli/src/commands/status.ts packages/cli/src/commands/log.ts | grep -v ":0" | wc -l | grep -q "^0$"
-- CRITIC: skip
-- SPEC:
-  Three different formatCost implementations exist with different precisions
-  (audit RISK 9):
-    cost.ts:    2 decimals → $1.40
-    status.ts:  2 decimals → $1.40
-    log.ts:     4 decimals → $1.4000
-    TaskRow.tsx: 3 decimals → $1.400 / $1.400*
-    TaskDetail.tsx (formatCostDisplay): 4 decimals → $1.4000 (api)
-    CostSummary.tsx: inline Intl.NumberFormat, 2-4 decimals
-
-  Same number, six different presentations. Confusing.
-
-  Standard going forward (one rule):
-    Aggregate views (totals, summaries, per-project, per-run): 2 decimals → $1.40
-    Per-task drilldown views: 4 decimals → $1.4000 (precision matters when costs are tiny)
-
-  Step 1 — Create packages/cli/src/lib/format.ts:
-  ```ts
-  export function formatCost(cost: number | null | undefined, mode: 'aggregate' | 'detail' = 'aggregate'): string {
+  export function formatCost(
+    cost: number | null | undefined,
+    mode: 'aggregate' | 'detail' = 'aggregate'
+  ): string {
     if (cost == null) return '—';
-    if (cost === 0) return mode === 'detail' ? '$0.0000' : '$0.00';
     const decimals = mode === 'detail' ? 4 : 2;
     return `$${cost.toFixed(decimals)}`;
   }
@@ -424,88 +84,246 @@
   }
   ```
 
-  Step 2 — Create packages/dashboard/src/lib/format.ts with the SAME
-  exported functions (mirror — dashboard cannot import from packages/cli).
-  Keep them identical character-for-character so behavior matches.
+  Step 2 — Replace packages/dashboard/src/lib/format.ts entire contents with
+  the IDENTICAL three functions above. Mirror — character-for-character.
+  Delete formatCostDisplay, getCostProps, formatCostIntl.
 
-  Step 3 — Replace local formatCost / formatNumber / formatTokens
-  implementations in:
-    packages/cli/src/commands/cost.ts
-    packages/cli/src/commands/status.ts
-    packages/cli/src/commands/log.ts (use 'detail' mode)
-    packages/dashboard/src/components/TaskRow.tsx
-    packages/dashboard/src/components/CostSummary.tsx (use 'aggregate' mode)
-    packages/dashboard/src/pages/TaskDetail.tsx (use 'detail' mode)
-  Import the shared helper instead. Delete the local implementations.
+  Step 3 — Update every consumer:
+  CLI:
+    cost.ts → formatCost(value, 'aggregate') for tables and summaries
+    status.ts → formatCost(value, 'aggregate')
+    log.ts → formatCost(value, 'detail') for per-task drill-down
+  Dashboard:
+    TaskRow.tsx → formatCost(value, 'aggregate'). Asterisk + tooltip suffix
+                  for max-mode stays local to TaskRow.
+    CostSummary.tsx → formatCost(value, 'aggregate')
+    TaskDetail.tsx → formatCost(value, 'detail'). The (api) / equivalent (max)
+                     suffix logic stays local to TaskDetail.
+    RunDetail.tsx → formatCost(value, 'aggregate'). Delete the inline
+                    formatCost at lines 74-81.
+    RunCard.tsx → formatCost(value, 'aggregate'). Delete raw .toFixed(3) at
+                  line 78. This was the most egregious bypass.
 
-  Step 4 — TaskRow's auth-mode suffix ('*' for max with tooltip) is NOT part
-  of formatCost — it's the caller's job. Keep that logic local to TaskRow.
+  Step 4 — Delete every old implementation: formatCostDisplay, getCostProps,
+  formatCostIntl, RunDetail's inline formatCost, RunCard's raw .toFixed(3),
+  any local formatCost / formatNumber / formatTokens in cost.ts / status.ts /
+  log.ts.
 
-  Do NOT change the auth-mode suffix conventions ((api), equivalent (max),
-  the asterisk pattern). Only the numeric format gets unified.
+  Do NOT change auth-mode suffix conventions. Do NOT touch the asterisk-with-
+  tooltip pattern in TaskRow. Only numeric formatting gets unified.
 
-## T8: Display totalCost in CostSummary, fix dead worktreePath param
+## T3: Aggregate token displays = input + output only (exclude cache)
 - STATUS: done
-- FILES: packages/dashboard/src/components/CostSummary.tsx, packages/cli/src/cost/parser.ts, packages/cli/src/engine/orchestrator.ts
-- VERIFY: cd packages/cli && pnpm build && cd ../dashboard && pnpm build && grep -q "totalCost\|total" packages/dashboard/dist/assets/*.js && ! grep -q "worktreePath" packages/cli/dist/cost/parser.js
+- FILES: packages/dashboard/src/components/CostSummary.tsx, packages/dashboard/src/pages/RunDetail.tsx
+- VERIFY: cd packages/dashboard && pnpm build && ! grep -E "tokens\.cache_read|tokens\.cache_write|cache_read_tokens.*\+|cache_write_tokens.*\+" packages/dashboard/src/components/CostSummary.tsx && ! grep -E "tokens\.cache_read|tokens\.cache_write|cache_read_tokens.*\+|cache_write_tokens.*\+" packages/dashboard/src/pages/RunDetail.tsx
 - CRITIC: skip
-- SPEC:
-  Two unrelated cleanups surfaced by the audits, bundled because each is
-  trivial alone.
+- SPEC: CostSummary "Total Tokens" card shows 24.8M because totalTokens sums
+  all four token types including cache_read which dominates by ~100x.
+  Misleading — users expect "tokens" to mean billable work. See audit
+  Section 2 + RISK 3.
 
-  Cleanup 1 — CostSummary computed totalCost (audit display RISK 10):
-  CostSummary.tsx:54 computes:
-    const totalCost = summary.api.cost_usd + summary.max.cost_usd_equivalent;
-  but never renders it. The user sees API cost and Max equivalent cost as
-  two separate numbers with no total — they have to add in their head.
+  Rule: at AGGREGATE level (CostSummary, RunDetail header, project cards),
+  "Tokens" = input + output ONLY. Cache tokens stay visible at DETAIL level
+  (TaskDetail, CLI cost --global, CLI per-task table) — those are unchanged.
 
-  Add a 4th element to the layout (or expand the 3-card grid to show a total
-  beneath). Render as the unified formatCost (aggregate mode → 2 decimals).
-  Label it "Total" with subtitle "API + Max equivalent".
+  Step 1 — In packages/dashboard/src/components/CostSummary.tsx find the
+  totalTokens computation (audit located at lines 58-59). Change to:
+  `const totalTokens = tokens.input + tokens.output;`
 
-  Cleanup 2 — captureTaskCost dead parameter (audit capture postfix):
-  packages/cli/src/engine/orchestrator.ts captureTaskCost signature is:
-    captureTaskCost(worktreePath, containerStartMs, authMode)
-  But after T5 of v1.3.2, worktreePath is never used inside the function —
-  findLatestSessionFile no longer takes it. The parameter is dead.
+  Step 2 — Same file, the "Total Tokens" card. Below the value, add a small
+  footnote in muted text:
+  `* Input + output. Cache tokens shown in task detail.`
 
-  Remove worktreePath from the captureTaskCost signature. Update the call
-  site (orchestrator.ts itself, around the existing capture invocation) to
-  not pass it.
+  Step 3 — In packages/dashboard/src/pages/RunDetail.tsx the token computation
+  at line 254 already does input + output (correct). After T1's flat shape
+  fix it will read `costData.input_tokens + costData.output_tokens`. Add the
+  same footnote below the Tokens card value:
+  `* Input + output. Cache tokens shown in task detail.`
 
-  Verify the worktree path is not used for anything else in captureTaskCost
-  before removing — if it has another use, leave it. (The audit confirms it
-  has no other use, but verify by reading the function before changing.)
+  CLI is already correct: per-project table uses IN-TOK / OUT-TOK columns,
+  per-task table uses input + output, --global prints all four separately
+  as a detail view. No CLI changes needed.
 
-  Do NOT modify findLatestSessionFile (that's already correct).
+  Do NOT remove cache token display from TaskDetail. Do NOT remove cache
+  display from CLI --global. Do NOT change the underlying schema or queries.
 
-## T9: README — update cost section to match new structure
+## T4: Collapse "API Cost" + "Max Equivalent" → single "Cost" label
+- STATUS: done
+- FILES: packages/dashboard/src/components/CostSummary.tsx, packages/dashboard/src/pages/RunDetail.tsx, packages/dashboard/src/components/RunCard.tsx, packages/cli/src/commands/cost.ts, packages/cli/src/commands/status.ts
+- VERIFY: cd packages/dashboard && pnpm build && cd ../cli && pnpm build && ! grep -rE "API Cost|Max Equivalent|\\\$EQUIV|\\\$MAX-EQ|\\\$API\b|Max equivalent API cost|Max tasks \(equiv|Max-equiv" packages/dashboard/src/components/ packages/dashboard/src/pages/ packages/cli/src/commands/ && grep -q "Token-based cost" packages/dashboard/src/components/CostSummary.tsx && grep -q "Token-based cost" packages/cli/src/commands/cost.ts
+- CRITIC: skip
+- SPEC: 16 user-facing strings across 6 files use "API Cost" / "Max Equivalent"
+  / "$EQUIV" / "$MAX-EQ" naming. Collapse all to a single "Cost" label. See
+  audit Section 5 for full inventory.
+
+  WHY: subscription users (Max) and API users care about the same number for
+  the same reason — what is this work worth in token terms? Auth mode is
+  implementation detail. One label, one footnote, no qualifiers.
+
+  Footnote (use this exact wording everywhere):
+  `* Token-based cost. Max-mode tasks show equivalent API cost.`
+
+  Dashboard:
+
+  CostSummary.tsx — currently has 3 cards: "API Cost", "Max Equivalent Cost",
+  "Total". Replace with 2 cards: "Cost" and "Tokens". Cost value =
+  api_cost_usd + max_cost_usd_equivalent. Add footnote in muted small text
+  below the Cost value.
+
+  RunDetail.tsx — same: 3 cost cards become 1 "Cost" card. Same footnote
+  pattern. Result: 2 cards total ("Cost" and "Tokens").
+
+  RunCard.tsx (project card on Overview) — already shows combined cost.
+  Drop the lowercase "cost" word after the dollar amount; the dollar sign
+  tells you what it is. No footnote (cards are too small).
+
+  CLI:
+
+  cost.ts per-project table — replace columns "$API" and "$EQUIV*" with
+  single column "$COST*". Value = api_cost_usd + max_cost_usd_equivalent.
+  Print the footnote at the bottom of the table after the total row.
+
+  cost.ts per-run table — replace columns "$API" and "$MAX-EQ" (plus
+  existing "$TOTAL" if present) with single column "$COST*". Same footnote.
+
+  cost.ts --global summary — replace separate "API tasks" and
+  "Max tasks (equiv.)" labels and lines with single "Cost: $X.XX*" line and
+  total tasks count. Replace the existing footnote at line 392 with the new
+  wording.
+
+  status.ts — currently prints `Cost: $X.XX API + $Y.YY Max-equiv · ...`.
+  Change to `Cost: $Z.ZZ* · NNK input / NNK output tokens` where Z.ZZ =
+  api + max sum. Print footnote on a new indented line below, only when
+  cost is non-zero.
+
+  KEEP per-task suffix conventions. TaskDetail.tsx and log.ts show
+  "(api)" or "equivalent (max)" suffix on individual task costs — these
+  stay. Only aggregate/rollup views drop the qualifier.
+
+  Do NOT modify TaskDetail.tsx. Do NOT modify log.ts. Do NOT change
+  auth_mode_cost field in schema or queries.
+
+## T5: Label RunCard cost line as all-time (resolve scope ambiguity)
+- STATUS: done
+- FILES: packages/dashboard/src/components/RunCard.tsx
+- VERIFY: cd packages/dashboard && pnpm build && grep -q "All-time" packages/dashboard/src/components/RunCard.tsx
+- CRITIC: skip
+- SPEC: Project card mixes last-run task counts (completed/failed/total) with
+  all-time cost aggregate. Both displayed without scope labels. User cannot
+  tell whether $12.77 is last run or lifetime. See audit Section 6.
+
+  Quick fix: prefix the cost line with explicit scope.
+
+  In packages/dashboard/src/components/RunCard.tsx find the cost line (audit
+  located at line 78). After T4 it renders just the formatted cost. Wrap it
+  with explicit scope context:
+  ```
+  <div className="text-xs text-gray-500 dark:text-gray-400">
+    All-time: {formatCost(totalCost, 'aggregate')}
+  </div>
+  ```
+
+  If `total_cost_tasks === 0` (no cost data captured for any run), render
+  nothing instead of "All-time: $0.00" — that would mislead (looks like
+  the project costs nothing rather than "no data captured").
+
+  The "Last run: 3h ago" text already establishes that the rest of the card
+  is last-run scoped. Adding "All-time:" to the cost line resolves the
+  ambiguity.
+
+  Do NOT add a date range picker (Round B). Do NOT change the API.
+
+## T6: TypeScript build passes cleanly in both packages
+- STATUS: done
+- FILES: packages/cli/src/db/connection.ts, packages/dashboard/src/api/db.ts, packages/dashboard/src/pages/Overview.tsx, packages/dashboard/tsconfig.json, packages/cli/src/commands/__tests__/log.test.ts, packages/cli/src/commands/__tests__/run-multi.test.ts, packages/cli/src/commands/__tests__/status.test.ts, packages/cli/src/db/__tests__/queries.test.ts
+- VERIFY: cd packages/cli && npx tsc --noEmit && cd ../dashboard && npx tsc --noEmit
+- CRITIC: skip
+- SPEC: ~29 TypeScript errors across both packages. Some recent (cross-rootDir
+  import added with v1.3.x cost work), some pre-existing. See audit Section 4
+  for full enumeration. Fix all of them. After this task, tsc --noEmit exits
+  zero in both packages.
+
+  WHY NOW: Round B will add new endpoints, components, types. If TS doesn't
+  catch type mismatches, every Round B task becomes another shipped-broken-
+  at-integration like T5. TS as a real guardrail = cheap audit-after.
+
+  Read .audits/audit-cost-display-v2-2026-04-15.md Section 4 for the
+  enumerated errors.
+
+  Category 1 — runMigrations option (5 occurrences):
+  OpenDbOptions in packages/cli/src/db/connection.ts has no runMigrations
+  property but multiple files pass it. Add `runMigrations?: boolean;` to
+  the interface. In openDb implementation, when runMigrations === true, call
+  migrate() after opening the connection. Otherwise skip. This makes existing
+  call sites valid AND gives them the behavior they intended.
+
+  Category 2 — cross-package import (1 occurrence):
+  dashboard/src/api/db.ts:3 imports from `../../../cli/src/db/connection.js`
+  — violates rootDir. In packages/dashboard/tsconfig.json add to
+  compilerOptions:
+  ```
+  "paths": {
+    "@noxdev/cli/db": ["../cli/src/db/connection.ts"]
+  }
+  ```
+  Update the import in dashboard/src/api/db.ts to use the alias.
+
+  Category 3 — useApi typing (Overview.tsx and other consumers):
+  costSummary at Overview.tsx:72 is typed unknown because useApi has no
+  generic. Find the useApi hook implementation. Add generic:
+  `function useApi<T = unknown>(url: string): { data: T | null, ... }`
+  Update callers in dashboard/src/pages/ and dashboard/src/components/ to
+  pass the expected type. For Overview.tsx:102 (projects possibly null in
+  .map): add `projects?.map(...)` or default to empty array.
+
+  Category 4 — namespace misuse for Database.Database (CLI ~25 errors):
+  Run `npx tsc --noEmit` in cli to enumerate. Common pattern:
+  Database.Database used where DatabaseSync from node:sqlite is correct.
+  Fix each to use the correct type from openDb's return type or the
+  imported DatabaseSync type.
+
+  Category 5 — bigint/number mismatches:
+  SQLite returns bigint for some columns. For each error, either cast
+  Number(value) at the boundary or update the type annotation to bigint.
+
+  Do NOT add `any` casts to silence errors. Use `unknown` + runtime guards
+  if a type genuinely can't be expressed. The point is to make TS a real
+  guardrail.
+
+## T7: Delete dead --all flag
+- STATUS: done
+- FILES: packages/cli/src/commands/cost.ts
+- VERIFY: cd packages/cli && pnpm build && ! grep -q "'--all'" packages/cli/src/commands/cost.ts
+- CRITIC: skip
+- SPEC: cost.ts:347 declares `--all` option but never reads it in the action
+  handler. T6 from previous round restructured the CLI so --all is now
+  redundant with the default (no-args) per-project breakdown. README already
+  documents the new structure without --all. See audit Section 4.
+
+  Delete the `.option('--all', ...)` line from the commander definition.
+
+  Other dead code (formatCostDisplay, getCostProps, formatCostIntl,
+  RunDetail's inline formatCost, RunCard's raw .toFixed(3), dashboard's
+  unused formatCost export) is handled by T2. getRunCostBreakdown is
+  wired up by T1 — no longer dead.
+
+  Do NOT change anything else in cost.ts.
+
+## T8: README — reflect new "Cost" label and Round A changes
 - STATUS: done
 - FILES: README.md
-- VERIFY: grep -q "noxdev cost" README.md && grep -q "per-project\|projects" README.md
+- VERIFY: grep -q "Token-based cost" README.md && ! grep -E "API Cost|Max Equivalent|\\\$API|\\\$EQUIV" README.md
 - CRITIC: skip
-- SPEC:
-  The README cost section (lines 113-150 per audit) shows aspirational
-  example output for `noxdev cost --all` that:
-    (a) uses the OLD command structure
-    (b) has never matched real output (capture was broken pre-v1.3.2)
+- SPEC: README cost section may show example output with old "$API" /
+  "$EQUIV" / "API Cost" / "Max Equivalent" labels. Update to reflect the
+  new single "Cost" column.
 
-  Update the README cost section to:
-    1. Document the new command hierarchy:
-       - noxdev cost              (per-project breakdown — default)
-       - noxdev cost <project>    (per-run breakdown for one project)
-       - noxdev cost --run <id>   (per-task breakdown for one run)
-       - noxdev cost --global     (global totals across all projects)
-    2. Replace the example output blocks with realistic examples reflecting
-       the new structure. If no real output is available yet, use synthetic
-       but plausible numbers (clearly mark as illustrative).
-    3. Note that cost data is captured per-task starting from v1.3.2 — older
-       runs will appear with no cost data. This is expected.
-    4. Document the dashboard equivalents:
-       - Overview cards show project totals
-       - Click into a project for runs table
-       - Click into a run for per-task breakdown
+  Find the cost section in README.md. Update example output snippets:
+    - Single "$COST*" column instead of "$API" / "$MAX-EQ" / "$EQUIV"
+    - Footnote: `* Token-based cost. Max-mode tasks show equivalent API cost.`
+    - "Tokens" or "Input/Output Tokens" labels in aggregates (not API/Max
+      breakdowns)
+    - Cache tokens only mentioned in per-task detail examples
 
-  Do NOT modify other README sections.
-  Do NOT modify CHANGELOG (cleanups in this round are not user-facing
-  enough to warrant a release note — handle in next version bump).
+  Do NOT modify CHANGELOG.md (Round A is plumbing, version bump waits for
+  Round B). Do NOT bump version strings.
