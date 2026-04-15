@@ -20,6 +20,8 @@ interface TaskResult {
   dev_log_file: string | null;
   critic_log_file: string | null;
   diff_file: string | null;
+  cost_usd: number | null;
+  auth_mode_cost: string | null;
 }
 
 interface RunDetail {
@@ -40,9 +42,24 @@ interface RunDetail {
   task_results: TaskResult[];
 }
 
+interface RunCostBreakdown {
+  run_id: string;
+  total_tasks: number;
+  tasks_with_cost: number;
+  input_tokens: number;
+  output_tokens: number;
+  cache_read_tokens: number;
+  cache_write_tokens: number;
+  api_tasks: number;
+  api_cost_usd: number;
+  max_tasks: number;
+  max_cost_usd_equivalent: number;
+}
+
 export default function RunDetail() {
   const { runId } = useParams();
   const { data: run, loading, error } = useApi<RunDetail>(`/api/runs/${runId}`);
+  const { data: costData, loading: costLoading } = useApi<RunCostBreakdown>(`/api/cost/runs/${runId}`);
 
   const formatDateTime = (timestamp: string): string => {
     return new Date(timestamp).toLocaleString('en-US', {
@@ -52,6 +69,24 @@ export default function RunDetail() {
       hour: '2-digit',
       minute: '2-digit',
     });
+  };
+
+  const formatCost = (cost: number): string => {
+    return new Intl.NumberFormat('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+      style: 'currency',
+      currency: 'USD',
+    }).format(cost);
+  };
+
+  const formatNumber = (num: number): string => {
+    if (num >= 1000000) {
+      return (num / 1000000).toFixed(1) + 'M';
+    } else if (num >= 1000) {
+      return (num / 1000).toFixed(1) + 'K';
+    }
+    return num.toString();
   };
 
   const calculateSummaryBar = () => {
@@ -178,6 +213,57 @@ export default function RunDetail() {
           </div>
         </div>
       </div>
+
+      {/* Cost Rollup Section */}
+      {costData && (
+        <div className="mb-8">
+          {costData.tasks_with_cost === 0 && costData.total_tasks > 0 ? (
+            <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-md p-4 mb-6">
+              <p className="text-yellow-800 dark:text-yellow-200 text-sm">
+                No cost data captured for this run.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-3 gap-4 mb-6">
+              <div className="text-center bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+                <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+                  {formatCost(costData.api_cost_usd)}
+                </div>
+                <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                  API Cost
+                </div>
+                <div className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+                  {costData.api_tasks} tasks
+                </div>
+              </div>
+
+              <div className="text-center bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+                <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">
+                  {formatCost(costData.max_cost_usd_equivalent)}
+                </div>
+                <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                  Max Equivalent
+                </div>
+                <div className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+                  {costData.max_tasks} tasks
+                </div>
+              </div>
+
+              <div className="text-center bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+                <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                  {formatNumber(costData.input_tokens + costData.output_tokens)}
+                </div>
+                <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                  Total Tokens
+                </div>
+                <div className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+                  {costData.tasks_with_cost} tasks with cost data
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Task List */}
       <div className="bg-white dark:bg-[var(--nox-surface)] rounded-lg border border-gray-200 dark:border-[var(--nox-border)] shadow-sm">
