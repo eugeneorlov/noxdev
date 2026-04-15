@@ -444,6 +444,11 @@ export function registerCost(program: Command): void {
             `${'TOTAL'.padEnd(16)} ${String(totalTasks).padStart(7)} ${formatNumber(totalInputTokens).padStart(9)} ${formatNumber(totalOutputTokens).padStart(9)} ${formatCost(totalApiCost + totalMaxCost, 'aggregate').padStart(9)}`
           );
 
+          if ((totalApiCost + totalMaxCost) > 0) {
+            console.log("");
+            console.log("* Token-based cost combines API and equivalent Max usage costs.");
+          }
+
           if (olderCount > 0) {
             console.log("");
             console.log(`Note: ${olderCount} older tasks have no cost data (pre-v1.2.0 runs).`);
