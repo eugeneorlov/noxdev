@@ -110,6 +110,8 @@ Safety layers include Docker containment, worktree isolation, and critic agent r
 
 A React web interface for reviewing overnight work. Run `noxdev dashboard` to start the local server. The dashboard shows execution summaries and commit diffs. Runs on localhost only for security.
 
+Click a project name from Overview to see project detail. Project view shows aggregate cost + flat task table with sortable columns.
+
 ## Token-based cost tracking
 
 noxdev captures token usage and cost per task from Claude Code session logs. The `noxdev cost` command provides detailed per-project breakdowns of API consumption across all your autonomous coding work, with options for per-run and per-task analysis.
@@ -148,6 +150,8 @@ Actual Max usage is flat-rate - this number helps track consumption.
 ```
 
 The **Cost** shows what this usage would have cost via API. Since actual Max usage is flat-rate, the dollar amount is for reference only - it helps you understand the scale of your consumption.
+
+*Token-based cost. Max-mode tasks show equivalent API cost.*
 
 **Cost analysis options:**
 - `noxdev cost` — per-project breakdown (default)
