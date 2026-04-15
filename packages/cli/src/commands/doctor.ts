@@ -150,11 +150,21 @@ export function registerDoctor(program: Command): void {
           execSync("sops --version", { stdio: "pipe" });
           return { passed: true };
         } catch {
-          return { passed: false, message: "SOPS not found. Secrets encryption unavailable." };
+          return { passed: false, message: "SOPS not found. API key encryption/decryption with 'sops -d' unavailable." };
         }
       }));
 
-      // 10. Python3 version (informational)
+      // 10. age installed
+      checks.push(runCheck("age installed", false, 'prerequisites', () => {
+        try {
+          const output = execSync("age --version", { encoding: "utf8" }).trim();
+          return { passed: true, message: output };
+        } catch {
+          return { passed: false, message: "age not found. Install from: https://age-encryption.org" };
+        }
+      }));
+
+      // 11. Python3 version (informational)
       checks.push(runCheck("Python3 version", false, 'prerequisites', () => {
         try {
           const output = execSync("python3 --version", { encoding: "utf8" }).trim();
@@ -164,7 +174,7 @@ export function registerDoctor(program: Command): void {
         }
       }));
 
-      // 11. uv version (informational)
+      // 12. uv version (informational)
       checks.push(runCheck("uv version", false, 'prerequisites', () => {
         try {
           const output = execSync("uv --version", { encoding: "utf8" }).trim();
@@ -174,7 +184,7 @@ export function registerDoctor(program: Command): void {
         }
       }));
 
-      // 12. Claude Code CLI in PATH
+      // 13. Claude Code CLI in PATH
       checks.push(runCheck("Claude Code CLI in PATH", true, 'prerequisites', () => {
         try {
           const output = execSync("claude --version", { encoding: "utf8" }).trim();
@@ -184,7 +194,7 @@ export function registerDoctor(program: Command): void {
         }
       }));
 
-      // 13. Claude credentials
+      // 14. Claude credentials
       checks.push(runCheck("Claude credentials", true, 'prerequisites', () => {
         const claudePath = join(homedir(), ".claude.json");
         if (existsSync(claudePath)) {
