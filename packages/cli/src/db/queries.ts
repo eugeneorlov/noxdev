@@ -281,3 +281,17 @@ export function getPerTaskCostData(db: Database, runId: string) {
     ORDER BY task_id
   `).all(runId);
 }
+
+export function getProjectTaskExecutions(db: Database, projectId: string) {
+  return db.prepare(`
+    SELECT
+      tr.*,
+      r.started_at as run_started_at,
+      r.auth_mode as run_auth_mode,
+      r.status as run_status
+    FROM task_results tr
+    JOIN runs r ON tr.run_id = r.id
+    WHERE r.project_id = ?
+    ORDER BY r.started_at DESC, tr.started_at DESC
+  `).all(projectId);
+}

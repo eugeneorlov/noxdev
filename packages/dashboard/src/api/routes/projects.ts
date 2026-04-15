@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { getDb } from '../db.js';
+import { getProjectTaskExecutions } from '../../../../cli/src/db/queries.js';
 
 const router: Router = Router();
 
@@ -73,6 +74,30 @@ router.get('/:id', (req, res) => {
   } catch (error) {
     console.error('Error fetching project:', error);
     res.status(500).json({ error: 'Failed to fetch project' });
+  }
+});
+
+// GET /api/projects/:projectId/tasks — returns all task executions for one project as a flat list
+router.get('/:projectId/tasks', (req, res) => {
+  try {
+    const db = getDb();
+    const projectId = req.params.projectId;
+
+    // Check if project exists
+    const projectQuery = `SELECT id FROM projects WHERE id = ?`;
+    const project = db.prepare(projectQuery).get(projectId);
+
+    if (!project) {
+      return res.status(404).json({ error: 'Project not found' });
+    }
+
+    // Get all task executions for this project
+    const taskExecutions = getProjectTaskExecutions(db, projectId);
+
+    res.json(taskExecutions);
+  } catch (error) {
+    console.error('Error fetching project task executions:', error);
+    res.status(500).json({ error: 'Failed to fetch project task executions' });
   }
 });
 
