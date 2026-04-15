@@ -208,3 +208,76 @@ export function getRunCostBreakdown(db: Database, runId: string) {
     WHERE run_id = ? AND model IS NOT NULL
   `).get(runId);
 }
+
+export function getPerRunCostData(db: Database, projectId: string | null, sinceDate: string) {
+  if (projectId === null) {
+    return [];
+  }
+
+  return db.prepare(`
+    SELECT
+      r.id as run_id,
+      r.started_at,
+      r.finished_at,
+      r.auth_mode,
+      r.status,
+      r.total_tasks,
+      r.completed,
+      r.failed,
+      r.skipped,
+      r.commit_before,
+      r.commit_after,
+      COALESCE(cost_data.tasks_with_cost, 0) as tasks_with_cost,
+      COALESCE(cost_data.input_tokens, 0) as input_tokens,
+      COALESCE(cost_data.output_tokens, 0) as output_tokens,
+      COALESCE(cost_data.cache_read_tokens, 0) as cache_read_tokens,
+      COALESCE(cost_data.cache_write_tokens, 0) as cache_write_tokens,
+      COALESCE(cost_data.api_cost_usd, 0) as api_cost_usd,
+      COALESCE(cost_data.max_cost_usd_equivalent, 0) as max_cost_usd_equivalent,
+      COALESCE(cost_data.api_tasks, 0) as api_tasks,
+      COALESCE(cost_data.max_tasks, 0) as max_tasks
+    FROM runs r
+    LEFT JOIN (
+      SELECT
+        tr.run_id,
+        COUNT(*) as tasks_with_cost,
+        SUM(tr.input_tokens) as input_tokens,
+        SUM(tr.output_tokens) as output_tokens,
+        SUM(tr.cache_read_tokens) as cache_read_tokens,
+        SUM(tr.cache_write_tokens) as cache_write_tokens,
+        SUM(CASE WHEN tr.auth_mode_cost = 'api' THEN tr.cost_usd ELSE 0 END) as api_cost_usd,
+        SUM(CASE WHEN tr.auth_mode_cost = 'max' THEN tr.cost_usd ELSE 0 END) as max_cost_usd_equivalent,
+        COUNT(CASE WHEN tr.auth_mode_cost = 'api' THEN 1 END) as api_tasks,
+        COUNT(CASE WHEN tr.auth_mode_cost = 'max' THEN 1 END) as max_tasks
+      FROM task_results tr
+      WHERE tr.model IS NOT NULL
+        AND (tr.started_at IS NULL OR tr.started_at >= ?)
+      GROUP BY tr.run_id
+    ) cost_data ON r.id = cost_data.run_id
+    WHERE r.project_id = ?
+      AND (r.started_at >= ? OR cost_data.tasks_with_cost > 0)
+    ORDER BY r.started_at DESC
+  `).all(sinceDate, projectId, sinceDate);
+}
+
+export function getPerTaskCostData(db: Database, runId: string) {
+  return db.prepare(`
+    SELECT
+      task_id,
+      status,
+      duration_seconds,
+      model,
+      input_tokens,
+      output_tokens,
+      cache_read_tokens,
+      cache_write_tokens,
+      cost_usd,
+      auth_mode_cost,
+      started_at,
+      finished_at
+    FROM task_results
+    WHERE run_id = ?
+      AND model IS NOT NULL
+    ORDER BY task_id
+  `).all(runId);
+}
