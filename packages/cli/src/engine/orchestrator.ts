@@ -39,7 +39,7 @@ function captureTaskCost(
   auth_mode_cost: string;
   cost_usd: number;
 } {
-  const jsonlPath = findLatestSessionFile(worktreePath, containerStartMs);
+  const jsonlPath = findLatestSessionFile(containerStartMs);
 
   if (jsonlPath === null) {
     // No session file found, return all-zero cost fields

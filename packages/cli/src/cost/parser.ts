@@ -59,49 +59,23 @@ export function parseSessionUsage(jsonlPath: string): SessionUsage {
   return result;
 }
 
-export function findLatestSessionFile(worktreePath: string, afterTimestamp: number): string | null {
-  try {
-    // Encode the worktree path the same way Claude Code does: replace / with -, KEEPING the leading dash
-    // Use path.resolve first, then replaceAll('/', '-')
-    const resolvedPath = path.resolve(worktreePath);
-    const encodedPath = resolvedPath.replaceAll('/', '-');
+// Container CWD as mounted by docker-run-{max,api}.sh
+// Claude Code encodes this as the project directory key.
+const CONTAINER_WORKSPACE = '/workspace';
 
-    // Build the projects dir: path.join(os.homedir(), '.claude', 'projects', encoded)
-    const projectsDir = path.join(os.homedir(), '.claude', 'projects', encodedPath);
+export function findLatestSessionFile(afterTimestamp: number): string | null {
+  const projectKey = CONTAINER_WORKSPACE.replaceAll('/', '-'); // "-workspace"
+  const projectsDir = path.join(os.homedir(), '.claude', 'projects', projectKey);
+  if (!fs.existsSync(projectsDir)) return null;
 
-    // If dir doesn't exist, return null
-    if (!fs.existsSync(projectsDir)) {
-      return null;
-    }
+  const files = fs.readdirSync(projectsDir)
+    .filter(f => f.endsWith('.jsonl'))
+    .map(f => {
+      const full = path.join(projectsDir, f);
+      return { full, mtimeMs: fs.statSync(full).mtimeMs };
+    })
+    .filter(f => f.mtimeMs >= afterTimestamp)
+    .sort((a, b) => b.mtimeMs - a.mtimeMs);
 
-    // Read all *.jsonl files, filter to those with mtimeMs >= afterTimestamp
-    const files = fs.readdirSync(projectsDir);
-    const jsonlFiles = files.filter(file => file.endsWith('.jsonl'));
-
-    let latestFile: string | null = null;
-    let latestMtime = -1;
-
-    for (const file of jsonlFiles) {
-      const fullPath = path.join(projectsDir, file);
-      try {
-        const stats = fs.statSync(fullPath);
-        const mtimeMs = stats.mtimeMs;
-
-        // Filter to those with mtimeMs >= afterTimestamp and find the highest
-        if (mtimeMs >= afterTimestamp && mtimeMs > latestMtime) {
-          latestMtime = mtimeMs;
-          latestFile = fullPath;
-        }
-      } catch (statError) {
-        // Skip files we can't stat
-        continue;
-      }
-    }
-
-    // Return the path of the one with the highest mtimeMs, or null if none match
-    return latestFile;
-  } catch (error) {
-    // If anything goes wrong, return null
-    return null;
-  }
+  return files.length > 0 ? files[0].full : null;
 }
