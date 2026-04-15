@@ -39,9 +39,7 @@ export function CostSummary({ summary, loading }: CostSummaryProps) {
       <div className="rounded-lg border p-4 mb-6">
         <div className="animate-pulse">
           <div className="h-6 bg-gray-200 rounded mb-4"></div>
-          <div className="grid grid-cols-4 gap-4">
-            <div className="h-16 bg-gray-200 rounded"></div>
-            <div className="h-16 bg-gray-200 rounded"></div>
+          <div className="grid grid-cols-2 gap-4">
             <div className="h-16 bg-gray-200 rounded"></div>
             <div className="h-16 bg-gray-200 rounded"></div>
           </div>
@@ -63,40 +61,16 @@ export function CostSummary({ summary, loading }: CostSummaryProps) {
         Cost Summary
       </h2>
 
-      <div className="grid grid-cols-4 gap-4">
-        <div className="text-center">
-          <div className="text-2xl font-bold text-green-600 dark:text-green-400">
-            {formatCost(summary.api.cost_usd, 'aggregate')}
-          </div>
-          <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-            Cost
-          </div>
-          <div className="text-xs text-gray-500 dark:text-gray-500 mt-1">
-            {summary.api.tasks} tasks
-          </div>
-        </div>
-
-        <div className="text-center">
-          <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">
-            {formatCost(summary.max.cost_usd_equivalent, 'aggregate')}
-          </div>
-          <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-            Cost
-          </div>
-          <div className="text-xs text-gray-500 dark:text-gray-500 mt-1">
-            {summary.max.tasks} tasks
-          </div>
-        </div>
-
+      <div className="grid grid-cols-2 gap-4">
         <div className="text-center">
           <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
             {formatCost(totalCost, 'aggregate')}
           </div>
           <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-            Total
+            Total Cost
           </div>
           <div className="text-xs text-gray-500 dark:text-gray-500 mt-1">
-            Token-based cost
+            {summary.api.tasks + summary.max.tasks} tasks
           </div>
         </div>
 
@@ -111,6 +85,11 @@ export function CostSummary({ summary, loading }: CostSummaryProps) {
             {summary.total_tasks} tasks
           </div>
         </div>
+      </div>
+
+      <div className="mt-4 text-xs text-gray-500 dark:text-gray-500 space-y-1">
+        <div>Token-based cost. Max-mode tasks show equivalent API cost.</div>
+        <div>Input + output. Cache tokens shown in task detail.</div>
       </div>
     </div>
   );

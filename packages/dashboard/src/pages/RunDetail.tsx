@@ -217,43 +217,38 @@ export default function RunDetail() {
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-3 gap-4 mb-6">
-              <div className="text-center bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
-                <div className="text-2xl font-bold text-green-600 dark:text-green-400">
-                  {formatCost(costData.api_cost_usd, 'aggregate')}
+            <>
+              <div className="grid grid-cols-2 gap-4 mb-6">
+                <div className="text-center bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+                  <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+                    {formatCost(costData.api_cost_usd + costData.max_cost_usd_equivalent, 'aggregate')}
+                  </div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                    Total Cost
+                  </div>
+                  <div className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+                    {costData.api_tasks + costData.max_tasks} tasks
+                  </div>
                 </div>
-                <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                  Cost
-                </div>
-                <div className="text-xs text-gray-500 dark:text-gray-500 mt-1">
-                  {costData.api_tasks} tasks
+
+                <div className="text-center bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+                  <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                    {formatNumber(costData.input_tokens + costData.output_tokens)}
+                  </div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                    Total Tokens
+                  </div>
+                  <div className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+                    {costData.tasks_with_cost} tasks with cost data
+                  </div>
                 </div>
               </div>
 
-              <div className="text-center bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
-                <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">
-                  {formatCost(costData.max_cost_usd_equivalent, 'aggregate')}
-                </div>
-                <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                  Cost
-                </div>
-                <div className="text-xs text-gray-500 dark:text-gray-500 mt-1">
-                  {costData.max_tasks} tasks
-                </div>
+              <div className="text-xs text-gray-500 dark:text-gray-500 space-y-1">
+                <div>Token-based cost. Max-mode tasks show equivalent API cost.</div>
+                <div>Input + output. Cache tokens shown in task detail.</div>
               </div>
-
-              <div className="text-center bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
-                <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                  {formatNumber(costData.input_tokens + costData.output_tokens)}
-                </div>
-                <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                  Total Tokens
-                </div>
-                <div className="text-xs text-gray-500 dark:text-gray-500 mt-1">
-                  {costData.tasks_with_cost} tasks with cost data
-                </div>
-              </div>
-            </div>
+            </>
           )}
         </div>
       )}
