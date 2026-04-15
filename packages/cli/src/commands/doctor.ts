@@ -160,7 +160,7 @@ export function registerDoctor(program: Command): void {
           const output = execSync("python3 --version", { encoding: "utf8" }).trim();
           return { passed: true, message: output };
         } catch {
-          return { passed: false, message: "python3 not found (not required for noxdev - available in Docker)" };
+          return { passed: false, message: "python3 not found. Install to run noxdev demo locally." };
         }
       }));
 
@@ -170,7 +170,7 @@ export function registerDoctor(program: Command): void {
           const output = execSync("uv --version", { encoding: "utf8" }).trim();
           return { passed: true, message: output };
         } catch {
-          return { passed: false, message: "uv not found (not required for noxdev - available in Docker)" };
+          return { passed: false, message: "uv not found. Install from: https://astral.sh/uv/install.sh" };
         }
       }));
 
