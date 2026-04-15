@@ -10,7 +10,7 @@
 
 Ship code while you sleep
 
-[![npm version](https://img.shields.io/badge/npm-1.3.0-green.svg)](https://www.npmjs.com/package/noxdev)
+[![npm version](https://img.shields.io/badge/npm-1.3.1-green.svg)](https://www.npmjs.com/package/noxdev)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D24.0.0-brightgreen.svg)](https://nodejs.org/)
 
@@ -170,6 +170,7 @@ You can override pricing rates by creating `~/.noxdev/pricing.json`:
 ## Requirements
 
 - Node.js >= 24
+- uv (install via: `curl -LsSf https://astral.sh/uv/install.sh | sh`)
 - Docker (with daemon running)
 - Git
 - Claude CLI (`claude login` required)
