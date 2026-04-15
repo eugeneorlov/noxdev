@@ -57,6 +57,7 @@ CREATE TABLE IF NOT EXISTS task_results (
   cost_usd REAL
 );
 
+CREATE INDEX IF NOT EXISTS idx_runs_project ON runs(project_id);
 CREATE INDEX IF NOT EXISTS idx_task_results_run ON task_results(run_id);
 CREATE INDEX IF NOT EXISTS idx_task_results_status ON task_results(status);
 CREATE INDEX IF NOT EXISTS idx_task_results_started ON task_results(started_at);
