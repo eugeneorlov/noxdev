@@ -3,7 +3,7 @@ import { execSync } from "node:child_process";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-export type AuthMode = "max" | "api";
+export type AuthMode = "max" | "api" | "gemini";
 
 export interface AuthResult {
   mode: AuthMode;
@@ -14,6 +14,7 @@ export interface AuthResult {
 export interface AuthConfig {
   max: { preferred: boolean };
   api: { fallback: boolean; dailyCapUsd: number; model: string };
+  gemini: { fallback: boolean; model: string };
   secrets: { provider: string; globalSecretsFile: string; ageKeyFile: string };
 }
 
@@ -45,7 +46,19 @@ export function resolveAuth(config: AuthConfig): AuthResult {
     }
   }
 
+  if (config.gemini.fallback) {
+    try {
+      const decrypted = execSync(
+        `sops -d --extract '["GEMINI_API_KEY"]' ${config.secrets.globalSecretsFile}`,
+        { encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] },
+      );
+      return { mode: "gemini", apiKey: decrypted.trim(), model: config.gemini.model };
+    } catch {
+      // Decryption failed — fall through to error
+    }
+  }
+
   throw new Error(
-    "No auth available. Max credentials not found at ~/.claude.json and API fallback is disabled or decryption failed.",
+    "No auth available. Max credentials not found at ~/.claude.json, and API/Gemini fallback is disabled or decryption failed.",
   );
 }

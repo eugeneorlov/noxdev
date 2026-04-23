@@ -17,6 +17,7 @@ import {
 } from "../db/queries.js";
 import { findLatestSessionFile, parseSessionUsage } from "../cost/parser.js";
 import { computeCostUsd } from "../cost/pricing.js";
+import { assertWorktreeHealthy } from "../commands/run.js";
 
 function getCurrentSha(cwd: string): string {
   return execSync("git rev-parse HEAD", { cwd, encoding: "utf-8" }).trim();
@@ -136,6 +137,13 @@ export async function executeRun(ctx: RunContext): Promise<void> {
   const circuitBreakerThreshold = 3;
 
   let lastSha = commitBefore;
+  let abortReason: string | null = null;
+
+  const healthInput = {
+    projectId: ctx.projectId,
+    projectGitDir: ctx.projectGitDir,
+    worktreePath: ctx.worktreeDir,
+  };
 
   for (const task of pendingTasks) {
     // Circuit breaker check
@@ -146,6 +154,38 @@ export async function executeRun(ctx: RunContext): Promise<void> {
         ),
       );
       skipped += pendingTasks.length - completed - failed;
+      break;
+    }
+
+    // Worktree invariant: pre-task. Infrastructure damage, not a task failure.
+    try {
+      assertWorktreeHealthy(healthInput);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      const now = isoNow();
+      insertTaskResult(ctx.db, {
+        runId: ctx.runId,
+        taskId: task.taskId,
+        title: task.title,
+        status: "FAILED",
+        exitCode: null,
+        authMode: ctx.auth.mode,
+        criticMode: task.critic,
+        attempt: 0,
+        commitSha: null,
+        startedAt: now,
+        finishedAt: now,
+        durationSeconds: 0,
+        devLogFile: null,
+        criticLogFile: null,
+        diffFile: null,
+      });
+      failed++;
+      abortReason = msg;
+      skipped += pendingTasks.length - completed - failed;
+      console.error(
+        chalk.red(`\n✖ Worktree invariant failed before ${task.taskId}:\n${msg}`),
+      );
       break;
     }
 
@@ -175,6 +215,20 @@ export async function executeRun(ctx: RunContext): Promise<void> {
       failed++;
       consecutiveFailures++;
     }
+
+    // Worktree invariant: post-task. If the task just completed damaged the
+    // worktree, abort before the next task reuses the broken state.
+    try {
+      assertWorktreeHealthy(healthInput);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      abortReason = msg;
+      skipped += pendingTasks.length - completed - failed;
+      console.error(
+        chalk.red(`\n✖ Worktree invariant failed after ${task.taskId}:\n${msg}`),
+      );
+      break;
+    }
   }
 
   // Get final git SHA
@@ -200,6 +254,10 @@ export async function executeRun(ctx: RunContext): Promise<void> {
   if (skipped > 0) parts.push(chalk.yellow(`${skipped} skipped`));
 
   console.log(`\nRun ${ctx.runId} complete: ${parts.join(", ")}`);
+
+  if (abortReason !== null) {
+    throw new Error(`Run aborted due to worktree corruption: ${abortReason}`);
+  }
 }
 
 async function executeTask(

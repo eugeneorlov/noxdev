@@ -18,8 +18,9 @@ export function runTaskInDocker(
   options: DockerRunOptions,
   auth: AuthResult,
 ): DockerRunResult {
-  const scriptName =
-    auth.mode === "max" ? "docker-run-max.sh" : "docker-run-api.sh";
+  let scriptName = "docker-run-api.sh";
+  if (auth.mode === "max") scriptName = "docker-run-max.sh";
+  else if (auth.mode === "gemini") scriptName = "docker-run-gemini.sh";
   const scriptPath = join(resolveScriptsDir(), scriptName);
 
   const args = [
@@ -34,7 +35,7 @@ export function runTaskInDocker(
     options.dockerImage,
   ];
 
-  if (auth.mode === "api") {
+  if (auth.mode === "api" || auth.mode === "gemini") {
     args.push(auth.apiKey!);
   }
 

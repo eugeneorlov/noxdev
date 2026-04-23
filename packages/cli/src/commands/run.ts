@@ -1,7 +1,7 @@
 import type { Command } from "commander";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { homedir } from "node:os";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, statSync, writeFileSync } from "node:fs";
 import { spawn, execSync } from "node:child_process";
 import chalk from "chalk";
 import type { Database } from "../db/connection.js";
@@ -50,6 +50,43 @@ interface ProjectRow {
   repo_path: string;
   worktree_path: string;
   branch: string;
+}
+
+export interface WorktreeHealthInput {
+  projectId: string;
+  projectGitDir: string;
+  worktreePath: string;
+}
+
+export function assertWorktreeHealthy(p: WorktreeHealthInput): void {
+  const repoPath = dirname(p.projectGitDir);
+  const worktreeMetaDir = join(p.projectGitDir, "worktrees", p.projectId);
+
+  if (!existsSync(worktreeMetaDir)) {
+    throw new Error(
+      `Worktree metadata deleted: ${worktreeMetaDir} no longer exists.\n` +
+        `An agent likely ran 'git worktree prune' or deleted .git/worktrees/${p.projectId}.\n` +
+        `Recovery: noxdev remove ${p.projectId} && noxdev init ${p.projectId} --repo ${repoPath}\n` +
+        `To preserve uncommitted work, back up ${p.worktreePath} first.`,
+    );
+  }
+
+  const worktreeGitPath = join(p.worktreePath, ".git");
+  if (!existsSync(worktreeGitPath)) {
+    throw new Error(
+      `Worktree .git pointer missing at ${worktreeGitPath}.\n` +
+        `The worktree directory may have been deleted or corrupted.`,
+    );
+  }
+
+  const stat = statSync(worktreeGitPath);
+  if (stat.isDirectory()) {
+    throw new Error(
+      `Worktree .git is a directory (should be a pointer file) at ${worktreeGitPath}.\n` +
+        `An agent likely ran 'git init' inside the worktree, overwriting the pointer.\n` +
+        `Recovery: noxdev remove ${p.projectId} && noxdev init ${p.projectId} --repo ${repoPath}`,
+    );
+  }
 }
 
 async function runProject(project: ProjectRow): Promise<void> {

@@ -9,6 +9,10 @@ export interface GlobalConfig {
       daily_cap_usd: number;
       model: string;
     };
+    gemini: {
+      fallback: boolean;
+      model: string;
+    };
   };
   safety: {
     auto_push: boolean;

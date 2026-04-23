@@ -14,6 +14,10 @@ const DEFAULT_GLOBAL_CONFIG: GlobalConfig = {
       daily_cap_usd: 5,
       model: "claude-sonnet-4-6",
     },
+    gemini: {
+      fallback: false,
+      model: "gemini-1.5-pro",
+    },
   },
   safety: {
     auto_push: false,

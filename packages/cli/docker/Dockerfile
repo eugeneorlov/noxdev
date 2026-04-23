@@ -26,6 +26,9 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
 # Claude Code CLI via npm (works in non-interactive Docker builds)
 RUN npm install -g @anthropic-ai/claude-code
 
+# Gemini CLI placeholder (update with actual preferred agent for Gemini)
+RUN npm install -g @google/gemini-cli || true
+
 # Non-root user (unused at runtime — host UID/GID + HOME=/tmp override via --user flag)
 # Kept for standalone `docker run noxdev-runner` debugging without --user flag
 RUN useradd -m -s /bin/bash runner \
