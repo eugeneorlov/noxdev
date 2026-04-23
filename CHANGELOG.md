@@ -5,6 +5,47 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.5] - 2026-04-23
+
+### Added
+- Worktree health invariant: `assertWorktreeHealthy()` runs before and after each task. Detects metadata directory deletion, missing `.git` pointer, and `.git` overwritten by `git init`. Aborts immediately with recovery instructions.
+- Gemini fallback auth mode alongside Max and API. New `gemini` block in global config (`fallback`, `model`), `GEMINI_API_KEY` resolved via sops, and `docker-run-gemini.sh` runner script.
+
+### Fixed
+- Agent-caused worktree corruption no longer silently burns through the circuit breaker — fails on first detection.
+
+## [1.3.4] - 2026-04-22
+
+### Added
+- New `ProjectView` page wired into Overview project cards — clickable navigation to a per-project totals header plus a flat, sortable task table.
+- New endpoint `GET /api/projects/:projectId/tasks` returning a flat task list.
+- Structural index for project-scoped queries.
+
+### Changed
+- CostSummary and RunDetail restructured — collapsed to 2 cards each with footnotes.
+- `lib/format.ts` rewritten to spec in both CLI and dashboard as identical mirrors with a `mode` parameter.
+- `cost.ts` per-project table now prints its footnote at the bottom (fixes a Round A regression).
+- "Total Tokens" card label renamed to "Tokens" everywhere it appears.
+
+## [1.3.3] - 2026-04-21
+
+### Added
+- Per-run cost query and new endpoint `GET /api/cost/runs/:runId`.
+- Per-project cost detail endpoint with per-run rows.
+- Cost stat on Overview project cards.
+- `ProjectView` page and `/projects/:id` route (initial implementation).
+- Cost rollup header and per-task cost column on `RunDetail`.
+
+### Changed
+- `noxdev cost` CLI restructured for clearer per-project / per-run output.
+- `formatCost` unified across CLI and dashboard.
+- CostSummary now displays `totalCost`; removed dead `worktreePath` param.
+- Aggregate token displays now show input + output only (cache tokens excluded).
+- Collapsed "API Cost" + "Max Equivalent" into a single "Cost" label; RunCard cost line labeled as all-time.
+
+### Removed
+- Dead `--all` flag on `noxdev cost`.
+
 ## [1.3.2] - 2026-04-15
 
 ### Added
