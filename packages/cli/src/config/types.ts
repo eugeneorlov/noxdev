@@ -24,6 +24,11 @@ export interface GlobalConfig {
     global: string;
     age_key: string;
   };
+  audit: {
+    enabled: boolean;
+    model: string;
+    max_attempts: number;
+  };
 }
 
 export interface ProjectConfig {

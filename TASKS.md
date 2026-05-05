@@ -1,410 +1,524 @@
-# Cost display Round B — A.1 fixes folded in + project-page redesign with flat task table
+# noxdev: Audit-Fix Loop (Opus Two-Model Pipeline)
 
-# Audits:
-#   .audits/audit-cost-display-v2-2026-04-15.md (pre-Round-A)
-#   .audits/audit-cost-display-round-a-after-2026-04-15.md (post-Round-A — what shipped wrong)
-# Round A.1 fixes (T1-T3) MUST land before Round B redesign tasks (T4-T9) to avoid
-# building the redesign on the broken formatCost foundation.
+# Feature: After Sonnet implements a task, Opus audits the implementation against
+# the spec and fixes gaps in a single container. A separate Opus re-audit confirms.
+# Up to 3 audit-fix attempts per task before marking failed.
+#
+# Dependencies: v1.3.5 codebase, no other feature branches
+# Gate between sessions: pnpm build
+#
+# Session 1: T1–T3 (config, auth, parser — foundation types)
+# Session 2: T4–T6 (db schema, db queries, engine types)
+# Session 3: T7–T9 (prompt builders — audit, fix+audit combo, re-audit)
+# Session 4: T10–T11 (docker model threading — types, runner, bash scripts)
+# Session 5: T12–T13 (orchestrator — the main loop, run.ts context threading)
 
-## T1: Rewrite both lib/format.ts files to spec — identical mirrors with mode parameter
-- STATUS: done
-- FILES: packages/cli/src/lib/format.ts, packages/dashboard/src/lib/format.ts, packages/cli/src/commands/cost.ts, packages/cli/src/commands/status.ts, packages/cli/src/commands/log.ts, packages/dashboard/src/components/TaskRow.tsx, packages/dashboard/src/components/CostSummary.tsx, packages/dashboard/src/pages/TaskDetail.tsx, packages/dashboard/src/pages/RunDetail.tsx, packages/dashboard/src/components/RunCard.tsx
-- VERIFY: cd packages/cli && pnpm build && cd ../dashboard && pnpm build && diff packages/cli/src/lib/format.ts packages/dashboard/src/lib/format.ts && grep -q "mode: 'aggregate' | 'detail'" packages/cli/src/lib/format.ts && grep -q "mode: 'aggregate' | 'detail'" packages/dashboard/src/lib/format.ts && ! grep -rE "'basic'|'display'|'props'|'currency'" packages/dashboard/src/lib/format.ts packages/dashboard/src/components/ packages/dashboard/src/pages/ && node -e "const {formatCost} = require('./packages/cli/dist/lib/format.js'); if (formatCost(1.5, 'aggregate') !== '\$1.50') process.exit(1); if (formatCost(1.5, 'detail') !== '\$1.5000') process.exit(1); if (formatCost(null) !== '—') process.exit(1);"
+## T1: Add audit config to GlobalConfig and defaults
+- STATUS: pending
+- FILES: packages/cli/src/config/types.ts, packages/cli/src/config/index.ts
+- VERIFY: cd packages/cli && pnpm build && node -e "const c = require('./dist/config/index.js'); const d = c.DEFAULT_GLOBAL_CONFIG || c.defaultGlobalConfig; console.log(JSON.stringify(d))" 2>/dev/null | grep -q '"audit"' && echo "PASS" || echo "FAIL"
 - CRITIC: skip
-- SPEC: Round A's T2 shipped a 4-mode multi-return-type API instead of the spec's
-  2-mode string-only API. Two lib/format.ts files are NOT mirrors. TaskRow and
-  RunCard show 3-decimal precision instead of 2. See audit-cost-display-round-a-
-  after section "T2 spec drift catalog".
-
-  This task redoes T2 properly. The VERIFY gate has THREE positive assertions
-  the previous round lacked:
-  1. `diff` between the two format.ts files (must exit 0 — files identical)
-  2. positive grep for `mode: 'aggregate' | 'detail'` signature in both files
-  3. behavioral assertion via `node -e` that formatCost actually produces
-     correct output for aggregate mode, detail mode, and null input
-
-  Step 1 — Replace packages/cli/src/lib/format.ts entire contents with EXACTLY:
+- SPEC: Add audit configuration block to GlobalConfig and wire defaults.
+  In packages/cli/src/config/types.ts, add to the GlobalConfig interface:
+  ```typescript
+  audit: {
+    enabled: boolean;
+    model: string;
+    max_attempts: number;
+  };
   ```
-  export function formatCost(
-    cost: number | null | undefined,
-    mode: 'aggregate' | 'detail' = 'aggregate'
+  In packages/cli/src/config/index.ts, add to DEFAULT_GLOBAL_CONFIG:
+  ```typescript
+  audit: {
+    enabled: true,
+    model: "claude-opus-4-6",
+    max_attempts: 3,
+  },
+  ```
+  The deepMerge() function already handles nested objects, so config.json
+  overrides will merge correctly without changes.
+  Do NOT change any other config fields or defaults.
+
+## T2: Add resolveAuditAuth to auth module
+- STATUS: pending
+- FILES: packages/cli/src/auth/index.ts
+- VERIFY: cd packages/cli && pnpm build && node -e "const a = require('./dist/auth/index.js'); console.log(typeof a.resolveAuditAuth)" 2>/dev/null | grep -q "function" && echo "PASS" || echo "FAIL"
+- CRITIC: skip
+- SPEC: Add a function that resolves auth specifically for the Opus audit/fix pass.
+  In packages/cli/src/auth/index.ts, add:
+  ```typescript
+  export function resolveAuditAuth(config: AuthConfig, auditModel: string): AuthResult {
+    // Audit always runs via API with the specified model (Opus).
+    // Max plan does not support Opus model selection, so we force API mode.
+    if (config.api?.fallback && config.api?.key) {
+      return {
+        mode: 'api' as AuthMode,
+        apiKey: config.api.key,
+        model: auditModel,
+      };
+    }
+    // If no API key configured, fall back to max with default model.
+    // This is degraded mode — Opus won't be used, but execution continues.
+    if (isMaxAvailable()) {
+      return {
+        mode: 'max' as AuthMode,
+        model: auditModel,
+      };
+    }
+    throw new Error('Audit requires API key for Opus model. Configure api.key in ~/.noxdev/config.json');
+  }
+  ```
+  Import AuthConfig from the config types if not already imported.
+  Export resolveAuditAuth alongside the existing resolveAuth.
+  Do NOT modify resolveAuth() or any other existing function.
+
+## T3: Add AUDIT field to TASKS.md parser
+- STATUS: pending
+- FILES: packages/cli/src/parser/tasks.ts
+- VERIFY: cd packages/cli && pnpm build && node -e "const p = require('./dist/parser/tasks.js'); const r = p.parseTasks('## T1: Test\n- STATUS: pending\n- FILES: foo.ts\n- VERIFY: echo ok\n- CRITIC: skip\n- AUDIT: skip\n- SPEC: do thing\n'); console.log(r[0].audit)" 2>/dev/null | grep -q "skip" && echo "PASS" || echo "FAIL"
+- CRITIC: skip
+- SPEC: Add AUDIT as a recognized field in the TASKS.md parser.
+  In packages/cli/src/parser/tasks.ts:
+  1. Add "audit" to the ParsedTask type:
+     ```typescript
+     audit?: 'skip' | 'enabled';
+     ```
+  2. Add AUDIT to the FIELD_RE alternation. Find the regex that matches
+     field names (STATUS|FILES|VERIFY|CRITIC|SPEC) and add AUDIT:
+     ```
+     STATUS|FILES|VERIFY|CRITIC|AUDIT|SPEC
+     ```
+  3. In the parsing logic where fields are assigned to the task object,
+     add handling for the AUDIT field:
+     ```typescript
+     case 'audit':
+       currentTask.audit = value.trim().toLowerCase() as 'skip' | 'enabled';
+       break;
+     ```
+  Default when AUDIT field is absent: undefined (orchestrator will check
+  global config audit.enabled as fallback).
+  Do NOT change any other parser behavior, field ordering, or regex structure.
+
+## T4: Add audit columns to SQLite schema and migration
+- STATUS: pending
+- FILES: packages/cli/src/db/migrate.ts
+- VERIFY: cd packages/cli && pnpm build && node -e "const m = require('./dist/db/migrate.js'); const s = m.SCHEMA || ''; console.log(s)" 2>/dev/null | grep -q "audit_attempt" && echo "PASS" || echo "FAIL"
+- CRITIC: skip
+- SPEC: Add three columns to the task_results table for audit tracking.
+  In packages/cli/src/db/migrate.ts:
+  1. In the SCHEMA const, add to the task_results CREATE TABLE statement,
+     after the existing columns (before the closing parenthesis):
+     ```sql
+     audit_attempt     INTEGER,
+     audit_log_file    TEXT,
+     gap_analysis_file TEXT,
+     ```
+  2. Add idempotent ALTER TABLE migrations for existing databases.
+     Follow the existing pattern that uses PRAGMA table_info() to detect
+     missing columns. Add after the existing migration blocks:
+     ```typescript
+     // Audit-fix loop columns (v1.4.0)
+     const taskResultCols = db.prepare("PRAGMA table_info('task_results')").all() as Array<{name: string}>;
+     const colNames = taskResultCols.map(c => c.name);
+     if (!colNames.includes('audit_attempt')) {
+       db.exec("ALTER TABLE task_results ADD COLUMN audit_attempt INTEGER");
+     }
+     if (!colNames.includes('audit_log_file')) {
+       db.exec("ALTER TABLE task_results ADD COLUMN audit_log_file TEXT");
+     }
+     if (!colNames.includes('gap_analysis_file')) {
+       db.exec("ALTER TABLE task_results ADD COLUMN gap_analysis_file TEXT");
+     }
+     ```
+  Do NOT modify any existing columns or migration logic.
+
+## T5: Extend insertTaskResult with audit fields
+- STATUS: pending
+- FILES: packages/cli/src/db/queries.ts
+- VERIFY: cd packages/cli && pnpm build && grep -q "audit_attempt" dist/db/queries.js && grep -q "gap_analysis_file" dist/db/queries.js && echo "PASS" || echo "FAIL"
+- CRITIC: skip
+- SPEC: Extend the insertTaskResult() function to accept and store audit fields.
+  In packages/cli/src/db/queries.ts, find the insertTaskResult() function.
+  It currently has ~23 named params.
+  1. Add to the function parameters (as optional):
+     ```typescript
+     auditAttempt?: number | null,
+     auditLogFile?: string | null,
+     gapAnalysisFile?: string | null,
+     ```
+  2. Add the three columns to the INSERT statement's column list and
+     VALUES placeholder list. Use the same pattern as existing nullable
+     columns (pass null when not provided).
+  3. Add the three values to the parameter binding object.
+  Do NOT change any other query functions. Do NOT rename existing parameters.
+  Preserve the existing parameter ordering — add new params at the end.
+
+## T6: Add auditAttempt and gapAnalysisFile to TaskExecResult
+- STATUS: pending
+- FILES: packages/cli/src/engine/types.ts
+- VERIFY: cd packages/cli && pnpm build && grep -q "auditAttempt" dist/engine/types.js 2>/dev/null; grep -q "gapAnalysisFile" dist/engine/types.js 2>/dev/null; echo "PASS"
+- CRITIC: skip
+- SPEC: Extend the TaskExecResult type in packages/cli/src/engine/types.ts.
+  Add two optional fields:
+  ```typescript
+  auditAttempt?: number;
+  gapAnalysisFile?: string | null;
+  ```
+  Do NOT change RunContext or any other types in this file.
+
+## T7: Build audit+fix prompt builder
+- STATUS: pending
+- FILES: packages/cli/src/prompts/builder.ts
+- VERIFY: cd packages/cli && pnpm build && node -e "const b = require('./dist/prompts/builder.js'); console.log(typeof b.buildAuditFixPrompt)" 2>/dev/null | grep -q "function" && echo "PASS" || echo "FAIL"
+- CRITIC: skip
+- SPEC: Add the combined audit+fix prompt builder. This prompt drives a single
+  Opus container that first audits the implementation against the spec, writes
+  a gap analysis file, then fixes all gaps it found.
+  In packages/cli/src/prompts/builder.ts, add:
+  ```typescript
+  export function buildAuditFixPrompt(
+    task: ParsedTask,
+    diffContent: string,
+    gapFilePath: string,
+    previousGapAnalysis?: string,
   ): string {
-    if (cost == null) return '—';
-    const decimals = mode === 'detail' ? 4 : 2;
-    return `$${cost.toFixed(decimals)}`;
-  }
+    const preamble = [
+      'CRITICAL CONSTRAINT: The SPEC below is the sole source of truth.',
+      'Do NOT deviate from it. Do NOT improve it. Do NOT reinterpret it.',
+      'If the spec is ambiguous, implement the most literal reading.',
+      'If the spec is impossible, write the reason to the gap analysis file and stop.',
+    ].join('\n');
 
-  export function formatTokens(n: number | null | undefined): string {
-    if (n == null) return '—';
-    if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-    if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
-    return n.toString();
-  }
+    const sections = [
+      preamble,
+      '',
+      `## Task: ${task.taskId}: ${task.title}`,
+      '',
+      '## Specification (source of truth)',
+      task.spec,
+      '',
+      '## Files referenced',
+      task.files || '(none specified)',
+      '',
+      '## Current diff (changes made by developer agent)',
+      '```',
+      diffContent,
+      '```',
+    ];
 
-  export function formatTokensFull(n: number | null | undefined): string {
-    if (n == null) return '—';
-    return new Intl.NumberFormat('en-US').format(n);
-  }
-  ```
+    if (previousGapAnalysis) {
+      sections.push(
+        '',
+        '## Previous gap analysis (attempt failed to fully fix — try again)',
+        previousGapAnalysis,
+      );
+    }
 
-  Step 2 — Replace packages/dashboard/src/lib/format.ts entire contents with
-  THE SAME CHARACTER-FOR-CHARACTER text. Delete every other export from this
-  file. Delete the 'props' mode that returns CSS classes — that mixing of
-  formatting with presentation belongs in the consumer (TaskRow), not the
-  formatter.
+    sections.push(
+      '',
+      '## Your task',
+      '1. Compare the diff against the specification above.',
+      '2. Identify ALL gaps: missing functionality, wrong behavior, spec deviations,',
+      '   skipped requirements, TODO placeholders, incorrect implementations.',
+      `3. Write your gap analysis to: ${gapFilePath}`,
+      '   Format: one gap per line, prefixed with "- GAP: " followed by description.',
+      '   If no gaps found, write a single line: "- NO_GAPS_FOUND"',
+      '4. Fix every gap you identified. Edit the source files directly.',
+      '5. Do NOT add functionality beyond what the spec requires.',
+      '6. Do NOT refactor or improve code outside the scope of identified gaps.',
+      '',
+      `## Verify command: ${task.verify}`,
+      'After fixing, run the verify command. It must pass.',
+    );
 
-  Step 3 — Update every consumer to use the new 2-mode API:
-  - cost.ts → formatCost(value, 'aggregate')
-  - status.ts → formatCost(value, 'aggregate')
-  - log.ts → formatCost(value, 'detail')
-  - TaskRow.tsx → formatCost(value, 'aggregate'). The asterisk-with-tooltip
-    suffix for max-mode now lives ENTIRELY in TaskRow component code (read
-    auth_mode, conditionally render the asterisk and tooltip). formatCost
-    only returns the dollar string.
-  - CostSummary.tsx → formatCost(value, 'aggregate')
-  - TaskDetail.tsx → formatCost(value, 'detail'). The "(api)" / "equivalent
-    (max)" suffix logic stays local to TaskDetail.
-  - RunDetail.tsx → formatCost(value, 'aggregate')
-  - RunCard.tsx → formatCost(value, 'aggregate')
-
-  Step 4 — Verify zero references to the old 4-mode strings remain anywhere
-  in dashboard (the negative grep in VERIFY enforces this).
-
-  Do NOT add any other exports to format.ts. Do NOT add options object,
-  precision parameter, or class-name returns. The two files must be byte-
-  identical mirrors.
-
-## T2: Restructure CostSummary and RunDetail — collapse to 2 cards each + footnotes
-- STATUS: done
-- FILES: packages/dashboard/src/components/CostSummary.tsx, packages/dashboard/src/pages/RunDetail.tsx, packages/dashboard/src/lib/format.ts
-- VERIFY: cd packages/dashboard && pnpm build && grep -c "<Card" packages/dashboard/src/components/CostSummary.tsx | head -1 | grep -qE "^[12]$" && grep -q "Token-based cost. Max-mode tasks show equivalent API cost." packages/dashboard/src/components/CostSummary.tsx && grep -q "Token-based cost. Max-mode tasks show equivalent API cost." packages/dashboard/src/pages/RunDetail.tsx && grep -q "Input + output. Cache tokens shown in task detail." packages/dashboard/src/components/CostSummary.tsx && grep -q "Input + output. Cache tokens shown in task detail." packages/dashboard/src/pages/RunDetail.tsx && ! grep -q "Max equivalent API cost" packages/dashboard/src/lib/format.ts && grep -qE "grid-cols-2" packages/dashboard/src/components/CostSummary.tsx
-- CRITIC: skip
-- SPEC: Round A's T4 renamed labels but did NOT restructure cards. CostSummary
-  still has 4 cards (2 saying "Cost" with different values — worse UX than
-  before the rename). RunDetail still has 3 cards. See audit section "T4 spec
-  drift catalog".
-
-  This task does the structural change Round A skipped.
-
-  Spec requirement: AGGREGATE views show ONE Cost card (combined api_cost_usd
-  + max_cost_usd_equivalent) and ONE Tokens card. That's it. Two cards total.
-
-  The asterisk-suffix pattern with footnote is how we honestly communicate
-  the auth-mode caveat without requiring two cards.
-
-  Footnote (use this EXACT wording everywhere):
-  `* Token-based cost. Max-mode tasks show equivalent API cost.`
-
-  Tokens footnote (use this EXACT wording everywhere):
-  `* Input + output. Cache tokens shown in task detail.`
-
-  Step 1 — In packages/dashboard/src/components/CostSummary.tsx delete the 4
-  cards (api_cost_usd card, max_cost_usd_equivalent card, totalCost card,
-  tokens card) and replace with EXACTLY 2:
-  - Card 1: label "Cost*", value = formatCost(api_cost_usd + max_cost_usd_equivalent, 'aggregate')
-    Below the value, in muted small text: `* Token-based cost. Max-mode tasks show equivalent API cost.`
-  - Card 2: label "Tokens*", value = formatTokens(input + output)
-    Below the value, in muted small text: `* Input + output. Cache tokens shown in task detail.`
-
-  Layout: change `grid-cols-4` to `grid-cols-2`.
-
-  Step 2 — In packages/dashboard/src/pages/RunDetail.tsx delete the 3 cards
-  (api card, max card, tokens card) and replace with EXACTLY 2 cards using
-  the same structure as CostSummary. Use formatCost from lib/format.ts (T1
-  must land first). Same two footnotes.
-
-  Step 3 — In packages/dashboard/src/lib/format.ts (after T1's mirror rewrite),
-  if `"Max equivalent API cost"` string still exists anywhere, delete it. The
-  footnote in the visible UI is the canonical source; tooltips don't need
-  this string anymore because the auth-mode-aware suffix lives in TaskRow.
-
-  CRITICAL: The VERIFY gate counts `<Card` occurrences in CostSummary.tsx —
-  must be 1 or 2 (regex `^[12]$`). 3+ cards fails the gate. Plus positive
-  greps for both footnote strings in both files plus a `grid-cols-2` check.
-  These are the assertions Round A was missing.
-
-  Do NOT keep the old 4-card layout "for backwards compat". This is a
-  hobby project, no users to break. Make the cut clean.
-
-## T3: Add structural index for project-scoped queries
-- STATUS: done
-- FILES: packages/cli/src/db/migrate.ts, packages/cli/src/db/schema.sql
-- VERIFY: cd packages/cli && pnpm build && grep -q "idx_runs_project" packages/cli/src/db/schema.sql && grep -q "idx_runs_project" packages/cli/src/db/migrate.ts
-- CRITIC: skip
-- SPEC: The new flat task-execution endpoint (T5) joins task_results → runs →
-  projects with WHERE project_id filter. There is no index on runs(project_id)
-  per the v2 audit. A single project will accumulate many runs over time;
-  scanning all runs for each query is O(n) where n grows monotonically.
-
-  Add the index. Cheap insurance.
-
-  Step 1 — In packages/cli/src/db/schema.sql add after the runs table
-  definition:
-  `CREATE INDEX IF NOT EXISTS idx_runs_project ON runs(project_id);`
-
-  Step 2 — In packages/cli/src/db/migrate.ts find the migrations list. Add
-  a migration that runs the same CREATE INDEX statement so existing
-  installations get the index without recreating the database.
-
-  Use IF NOT EXISTS in both places — idempotent. Re-running migrations
-  on a database that already has the index is a no-op.
-
-  Do NOT add other indexes. Do NOT touch other tables.
-
-## T4: New endpoint GET /api/projects/:projectId/tasks for flat task list
-- STATUS: done
-- FILES: packages/dashboard/src/api/routes/projects.ts, packages/cli/src/db/queries.ts
-- VERIFY: cd packages/cli && pnpm build && cd ../dashboard && pnpm build && grep -q "/tasks" packages/dashboard/dist/api/server.js && grep -q "getProjectTaskExecutions" packages/cli/dist/db/queries.js
-- CRITIC: skip
-- SPEC: New endpoint returns every task execution for one project as a flat
-  list. Each row is one task in one run. Powers the new ProjectView flat
-  table (T6).
-
-  CRITICAL DATA-MODEL CONSTRAINT (encode in this SPEC because it's not
-  visible from the parser elsewhere): task_id values are NOT unique across
-  runs. Every TASKS.md reuses T1, T2, ... NEVER aggregate by task_id at
-  project level. Each row in the flat table is `(run_id, task_id)` — these
-  together identify a unique task execution.
-
-  Step 1 — Add a new query in packages/cli/src/db/queries.ts:
-  `getProjectTaskExecutions(db, projectId, sortBy, sortDir)` returning rows:
-  ```
-  {
-    run_id: string,
-    run_started_at: string,
-    task_id: string,
-    title: string,
-    status: string,
-    duration_seconds: number | null,
-    model: string | null,
-    auth_mode_cost: string | null,
-    cost_usd: number,
-    input_tokens: number,
-    output_tokens: number,
-    commit_sha: string | null,
-    attempt: number
+    return sections.join('\n');
   }
   ```
+  Do NOT modify buildTaskPrompt() or buildCriticPrompt(). Export the new
+  function alongside existing exports.
 
-  Query (works on existing schema, no new joins required beyond what's
-  documented in the v2 audit Section 3):
-  ```sql
-  SELECT
-    r.id as run_id,
-    r.started_at as run_started_at,
-    tr.task_id,
-    tr.title,
-    tr.status,
-    tr.duration_seconds,
-    tr.model,
-    tr.auth_mode_cost,
-    COALESCE(tr.cost_usd, 0) as cost_usd,
-    COALESCE(tr.input_tokens, 0) as input_tokens,
-    COALESCE(tr.output_tokens, 0) as output_tokens,
-    tr.commit_sha,
-    tr.attempt
-  FROM task_results tr
-  JOIN runs r ON tr.run_id = r.id
-  WHERE r.project_id = ?
-  ORDER BY <sortBy> <sortDir>
-  ```
+## T8: Build re-audit prompt builder
+- STATUS: pending
+- FILES: packages/cli/src/prompts/builder.ts
+- VERIFY: cd packages/cli && pnpm build && node -e "const b = require('./dist/prompts/builder.js'); console.log(typeof b.buildReAuditPrompt)" 2>/dev/null | grep -q "function" && echo "PASS" || echo "FAIL"
+- CRITIC: skip
+- SPEC: Add the re-audit prompt builder. This drives a SEPARATE Opus container
+  that only audits (no fixing) — clean eyes, no context from the fix pass.
+  In packages/cli/src/prompts/builder.ts, add:
+  ```typescript
+  export function buildReAuditPrompt(
+    task: ParsedTask,
+    diffContent: string,
+    previousGapAnalysis: string,
+    gapFilePath: string,
+  ): string {
+    const preamble = [
+      'CRITICAL CONSTRAINT: The SPEC below is the sole source of truth.',
+      'You are a REVIEWER. Do NOT modify any code.',
+      'Your ONLY job is to verify whether the implementation matches the spec.',
+    ].join('\n');
 
-  Validate sortBy against allowlist: ['cost_usd', 'run_started_at',
-  'duration_seconds', 'task_id']. Reject any other value (SQL injection
-  defense). Default sortBy = 'run_started_at', default sortDir = 'DESC'.
+    const sections = [
+      preamble,
+      '',
+      `## Task: ${task.taskId}: ${task.title}`,
+      '',
+      '## Specification (source of truth)',
+      task.spec,
+      '',
+      '## Files referenced',
+      task.files || '(none specified)',
+      '',
+      '## Current diff (all changes, including fixes)',
+      '```',
+      diffContent,
+      '```',
+      '',
+      '## Previous gap analysis',
+      previousGapAnalysis,
+      '',
+      '## Your task',
+      '1. Read the spec carefully.',
+      '2. Read the diff carefully.',
+      '3. Check whether ALL gaps from the previous analysis are now fixed.',
+      '4. Check for any NEW gaps introduced by the fix.',
+      `5. Write your findings to: ${gapFilePath}`,
+      '   Format: one gap per line, prefixed with "- GAP: "',
+      '   If all gaps are fixed and no new gaps: write "- NO_GAPS_FOUND"',
+      '6. Do NOT modify any source code. You are read-only.',
+      '',
+      `## Verify command: ${task.verify}`,
+      'Run the verify command to confirm the build still passes. Report if it fails.',
+    ];
 
-  Validate sortDir against ['ASC', 'DESC']. Default 'DESC'.
-
-  Step 2 — Add route in packages/dashboard/src/api/routes/projects.ts:
-  GET /api/projects/:projectId/tasks?sort=<col>&dir=<asc|desc>
-
-  Returns:
-  ```
-  {
-    project_id: string,
-    sort: { by: string, dir: 'asc' | 'desc' },
-    tasks: [...] // flat array from getProjectTaskExecutions
+    return sections.join('\n');
   }
   ```
+  Do NOT modify any existing prompt builders. Export alongside existing exports.
 
-  404 if project not found. 400 if sort param is not in allowlist (return
-  the allowed list in the error message).
-
-  Match existing route patterns. Use the same try/catch + 500 error handling
-  as other routes in this file.
-
-  Do NOT modify other routes. Do NOT change /api/cost/projects/:projectId
-  (the per-run-aggregates route stays — both will be needed eventually,
-  even if Round B doesn't use the runs aggregate route directly).
-
-## T5: New ProjectView — totals header + flat sortable task table (drop runs table)
-- STATUS: done
-- FILES: packages/dashboard/src/pages/ProjectView.tsx
-- VERIFY: cd packages/dashboard && pnpm build && grep -q "/api/projects/.*tasks" packages/dashboard/src/pages/ProjectView.tsx && ! grep -q "Runs" packages/dashboard/src/pages/ProjectView.tsx && grep -qE "sort.*cost|sort.*date|sortBy" packages/dashboard/src/pages/ProjectView.tsx
+## T9: Add model arg to Docker types and runner
+- STATUS: pending
+- FILES: packages/cli/src/docker/types.ts, packages/cli/src/docker/runner.ts
+- VERIFY: cd packages/cli && pnpm build && grep -q "model" dist/docker/types.js 2>/dev/null && grep "model" dist/docker/runner.js | head -3 && echo "PASS" || echo "FAIL"
 - CRITIC: skip
-- SPEC: Replace the current ProjectView (which shows project name + runs
-  list per audit T4 finding — no aggregate cards, just runs) with the
-  new design.
+- SPEC: Thread model selection through the Docker runner so the orchestrator
+  can switch between Sonnet (dev) and Opus (audit) per invocation.
+  1. In packages/cli/src/docker/types.ts, add to DockerRunOptions:
+     ```typescript
+     model?: string;
+     ```
+  2. In packages/cli/src/docker/runner.ts, in the runTaskInDocker() function:
+     Find where it builds the args array for the bash script invocation.
+     For docker-run-api.sh: add options.model (or auth.model as fallback)
+     as the last argument after the existing args.
+     For docker-run-max.sh: add options.model (or auth.model as fallback)
+     as the last argument after the existing args.
+     The bash scripts will be updated in the next task to accept this arg.
+     If options.model is undefined, pass auth.model (preserving current behavior).
+  Do NOT change the function signature of runTaskInDocker(). The model
+  flows through the existing options object.
 
-  This page answers: "what did this project cost overall, and which
-  individual task executions were the most expensive?"
-
-  No runs table. The flat task table groups by run when sorted by
-  run_started_at, but is the only data presentation.
-
-  Layout (top to bottom):
-
-  1. Header: back link "← Back to Overview", h1 with project display_name,
-     muted subtitle with repo_path.
-
-  2. Aggregate cards (use same 2-card pattern as T2's CostSummary):
-     - Card 1: "Cost*" — sum of all task cost_usd across all runs of this
-       project. Footnote: `* Token-based cost. Max-mode tasks show equivalent API cost.`
-     - Card 2: "Tokens*" — sum of input_tokens + output_tokens across all
-       tasks. Footnote: `* Input + output. Cache tokens shown in task detail.`
-     - Above these cards a small line: "N task executions across M runs"
-       where N = total task rows, M = distinct run count.
-     - If no tasks have model (no cost data captured), replace the cards
-       with a single banner: "No cost data captured yet for this project."
-
-  3. Flat task table:
-     Columns: Run Date | Task ID | Title | Status | Duration | Model | Cost
-     - Each row is one task execution.
-     - Click on a row navigates to /runs/:runId/tasks/:taskId (existing
-       TaskDetail page).
-     - Sortable column headers (click to toggle asc/desc, click another
-       column to switch). Default sort: Run Date DESC.
-     - Sort state managed via URL query string ?sort=<col>&dir=<asc|desc>
-       so links are shareable / refresh-safe.
-     - Format: Run Date as `MM/DD HH:mm`, Task ID as plain string,
-       Title truncated to ~60 chars with full text on hover, Status as
-       existing StatusBadge, Duration as `Mm Ss`, Model truncated to
-       e.g. "sonnet-4" (last meaningful component), Cost via
-       formatCost(value, 'aggregate') with auth-mode asterisk if max.
-     - When cost_usd is 0 AND model is null, show "—" in Cost column
-       (distinguishes "no data" from "$0.00").
-
-  Empty states:
-  - Zero tasks: "No tasks recorded for this project yet."
-  - 404 from API: "Project not found." with back link.
-
-  Implementation notes:
-  - Use useApi<{...}>('/api/projects/' + projectId + '/tasks?sort=' + sort + '&dir=' + dir)
-  - Aggregate the sums client-side from the returned tasks array — don't
-    add another endpoint just for the totals. The flat list is small
-    enough.
-  - Use existing useParams, useNavigate, useSearchParams hooks for the
-    URL state.
-  - Match existing visual language (Tailwind classes used elsewhere,
-    dark mode classes).
-
-  Do NOT add a runs list / runs table. The user explicitly chose the
-  Option B approach: one rich table.
-
-  Do NOT add filtering controls (auth mode, date range, status). Just
-  sorting for now per the user's choice.
-
-  Do NOT add row expansion / inline drill-down. Click navigates to
-  TaskDetail.
-
-## T6: Wire ProjectView into Overview project cards (clickable navigation)
-- STATUS: done
-- FILES: packages/dashboard/src/components/RunCard.tsx
-- VERIFY: cd packages/dashboard && pnpm build && grep -q "/projects/" packages/dashboard/src/components/RunCard.tsx
+## T10: Add model arg to bash Docker scripts
+- STATUS: pending
+- FILES: packages/cli/scripts/docker-run-max.sh, packages/cli/scripts/docker-run-api.sh
+- VERIFY: cd packages/cli && grep -q 'model=' scripts/docker-run-max.sh && grep -q 'model=' scripts/docker-run-api.sh && grep -q '"$model"' scripts/docker-run-max.sh && echo "PASS" || echo "FAIL"
 - CRITIC: skip
-- SPEC: After T5 the /projects/:id route renders a useful page. Make the
-  Overview project cards link to it.
+- SPEC: Accept model as the last positional argument in both Docker scripts,
+  replacing the current hardcoded model.
+  In packages/cli/scripts/docker-run-max.sh:
+  - The script currently takes 9 args. Add a 10th:
+    ```bash
+    model="${10:-claude-sonnet-4-20250514}"
+    ```
+  - Find the line with `--model claude-sonnet-4-20250514` (or similar hardcoded
+    model string) and replace with `--model "$model"`.
+  In packages/cli/scripts/docker-run-api.sh:
+  - The script currently takes 10 args. Add an 11th:
+    ```bash
+    model="${11:-claude-sonnet-4-20250514}"
+    ```
+  - Find the hardcoded --model and replace with `--model "$model"`.
+  Both scripts must default to Sonnet if the arg is not provided (backward
+  compatible — existing calls without the arg still work).
+  Do NOT change any other script behavior: volume mounts, env vars, flags,
+  timeout handling, credential restore.
 
-  Currently RunCard has a "View run details" link pointing to the LAST
-  RUN's detail page. That's still a useful link for "what was the most
-  recent run?" but the project-level deep link is more important now.
-
-  In packages/dashboard/src/components/RunCard.tsx:
-  - Make the project NAME (the card heading) a clickable link to
-    /projects/:projectId.
-  - KEEP the "View run details" link to the last run as a secondary
-    affordance below.
-
-  Use react-router-dom Link component (the existing pattern in this
-  codebase). Hover state: underline or color change consistent with
-  existing link styling.
-
-  Do NOT change the card's data fields. Do NOT change RunCard props
-  shape. Do NOT remove the "View run details" link.
-
-## T7: Rename "Total Tokens" card label to "Tokens" everywhere it appears
-- STATUS: done
-- FILES: packages/dashboard/src/components/CostSummary.tsx, packages/dashboard/src/pages/RunDetail.tsx, packages/dashboard/src/pages/ProjectView.tsx
-- VERIFY: cd packages/dashboard && pnpm build && ! grep -r "Total Tokens" packages/dashboard/src/components/ packages/dashboard/src/pages/
+## T11: Implement audit-fix loop in orchestrator
+- STATUS: pending
+- FILES: packages/cli/src/engine/orchestrator.ts
+- VERIFY: cd packages/cli && pnpm build && grep -q "runAuditAndFix" dist/engine/orchestrator.js && grep -q "runReAudit" dist/engine/orchestrator.js && echo "PASS" || echo "FAIL"
 - CRITIC: skip
-- SPEC: Aggregate views call it "Tokens" or "Total Tokens" inconsistently.
-  Per the agreed naming (single label "Cost", token noun is just "Tokens"
-  with footnote clarifying scope), use "Tokens" everywhere in dashboard
-  aggregate cards. The footnote explains "Input + output" — no need for
-  "Total" prefix.
+- SPEC: This is the core change. Replace/extend the critic flow with the
+  audit-fix loop. Use runCritic() as the structural template.
+  
+  In packages/cli/src/engine/orchestrator.ts:
+  
+  1. Add imports for buildAuditFixPrompt, buildReAuditPrompt from prompts/builder.
+     Add import for resolveAuditAuth from auth/index.
+  
+  2. Add function runAuditAndFix():
+     ```typescript
+     async function runAuditAndFix(
+       ctx: RunContext,
+       task: ParsedTask,
+       logDir: string,
+       auditAttempt: number,
+       claudeJsonSrc: string,
+       claudeSnapshot: Buffer,
+       preTaskSha: string,
+       previousGapAnalysis?: string,
+     ): Promise<{ fixed: boolean; gapAnalysisFile: string; auditLogFile: string }> {
+       // 1. Capture current diff
+       const diffFile = path.join(logDir, `audit-diff-attempt-${auditAttempt}.patch`);
+       captureDiff(ctx.worktreeDir, diffFile, preTaskSha);
+       const diffContent = fs.readFileSync(diffFile, 'utf-8');
+       
+       // 2. Build audit+fix prompt
+       const gapFile = path.join(logDir, `gap-analysis-T${task.taskId}-attempt-${auditAttempt}.md`);
+       // gapFile path inside container = same as host since worktree is mounted
+       const gapFileInContainer = gapFile; // adjust if paths differ
+       const prompt = buildAuditFixPrompt(task, diffContent, gapFileInContainer, previousGapAnalysis);
+       
+       // 3. Write prompt to temp file
+       const promptFile = path.join(logDir, `audit-fix-prompt-attempt-${auditAttempt}.md`);
+       fs.writeFileSync(promptFile, prompt, 'utf-8');
+       
+       // 4. Resolve Opus auth
+       const globalConfig = loadGlobalConfig(); // import from config
+       const auditAuth = resolveAuditAuth(globalConfig.api || {}, globalConfig.audit?.model || 'claude-opus-4-6');
+       
+       // 5. Restore credential snapshot before Docker run
+       fs.copyFileSync(claudeSnapshot, claudeJsonSrc); // same pattern as runCritic
+       
+       // 6. Run Docker with Opus model
+       const auditLog = path.join(logDir, `audit-fix-attempt-${auditAttempt}.log`);
+       const result = runTaskInDocker({
+         promptFile,
+         taskLog: auditLog,
+         timeoutSeconds: ctx.projectConfig?.docker?.timeout_minutes ? ctx.projectConfig.docker.timeout_minutes * 60 : 1800,
+         worktreeDir: ctx.worktreeDir,
+         projectGitDir: ctx.projectGitDir,
+         gitTargetPath: ctx.gitTargetPath,
+         memoryLimit: ctx.projectConfig?.docker?.memory || '4g',
+         cpuLimit: ctx.projectConfig?.docker?.cpus || 2,
+         dockerImage: 'noxdev-runner:latest',
+         model: globalConfig.audit?.model || 'claude-opus-4-6',
+       }, auditAuth);
+       
+       // 7. Check if gap file was written and contains NO_GAPS_FOUND
+       let fixed = false;
+       if (fs.existsSync(gapFile)) {
+         const gaps = fs.readFileSync(gapFile, 'utf-8');
+         fixed = gaps.includes('NO_GAPS_FOUND');
+       }
+       
+       return { fixed, gapAnalysisFile: gapFile, auditLogFile: auditLog };
+     }
+     ```
+     Adapt this pseudocode to match the exact patterns in the existing
+     runCritic() function — same credential restore dance, same Docker
+     option construction, same error handling. Use runCritic() as the
+     template; do not invent new patterns.
+  
+  3. Add function runReAudit():
+     ```typescript
+     async function runReAudit(
+       ctx: RunContext,
+       task: ParsedTask,
+       logDir: string,
+       auditAttempt: number,
+       claudeJsonSrc: string,
+       claudeSnapshot: Buffer,
+       preTaskSha: string,
+       previousGapAnalysis: string,
+     ): Promise<{ clean: boolean; gapAnalysisFile: string; auditLogFile: string }> {
+       // Same structure as runAuditAndFix but:
+       // - Uses buildReAuditPrompt (read-only, no fixing)
+       // - Separate container = clean eyes
+       // - Returns clean: true if NO_GAPS_FOUND
+       // Follow identical Docker/credential/diff pattern as runAuditAndFix
+     }
+     ```
+  
+  4. Modify executeTask() to add audit-fix loop after the developer pass.
+     After the developer agent completes and VERIFY passes, insert:
+     ```typescript
+     // Audit-fix loop (if enabled)
+     const auditEnabled = task.audit !== 'skip' && (globalConfig.audit?.enabled !== false);
+     if (auditEnabled) {
+       const maxAuditAttempts = globalConfig.audit?.max_attempts || 3;
+       let auditAttempt = 0;
+       let lastGapAnalysis: string | undefined;
+       let lastGapFile: string | undefined;
+       let lastAuditLog: string | undefined;
+       
+       for (auditAttempt = 1; auditAttempt <= maxAuditAttempts; auditAttempt++) {
+         // Run audit + fix
+         const auditResult = await runAuditAndFix(
+           ctx, task, logDir, auditAttempt,
+           claudeJsonSrc, claudeSnapshot, preTaskSha, lastGapAnalysis,
+         );
+         lastGapFile = auditResult.gapAnalysisFile;
+         lastAuditLog = auditResult.auditLogFile;
+         
+         // Run VERIFY after fix
+         // ... reuse existing verify logic from executeTask ...
+         
+         // Run re-audit (clean eyes)
+         const reauditResult = await runReAudit(
+           ctx, task, logDir, auditAttempt,
+           claudeJsonSrc, claudeSnapshot, preTaskSha,
+           fs.readFileSync(auditResult.gapAnalysisFile, 'utf-8'),
+         );
+         
+         if (reauditResult.clean) {
+           // All gaps fixed, done
+           break;
+         }
+         
+         // Feed re-audit gap analysis back into next attempt
+         lastGapAnalysis = fs.readFileSync(reauditResult.gapAnalysisFile, 'utf-8');
+       }
+       
+       // Store audit metadata in result
+       // ... set auditAttempt, gapAnalysisFile on TaskExecResult ...
+       
+       if (auditAttempt > maxAuditAttempts) {
+         // Mark as failed — existing circuit breaker handles run-level abort
+         // ... set status to failed with gap analysis attached ...
+       }
+     }
+     ```
+     This is pseudocode showing the flow. Integrate it into the existing
+     executeTask() control flow, reusing the existing verify/commit/error
+     patterns. Do not restructure executeTask() — extend it.
+  
+  5. Do NOT delete runCritic(). Leave it in place — tasks with CRITIC: review
+     and AUDIT: skip should still use the existing critic path.
+     The selection logic: if AUDIT is enabled for a task, skip critic and
+     run audit-fix loop instead. If AUDIT is skip, fall through to existing
+     critic behavior.
+  
+  6. Update the insertTaskResult() call at the end of executeTask() to pass
+     the new auditAttempt, auditLogFile, gapAnalysisFile fields.
 
-  Find every occurrence of "Total Tokens" (string literal or label) in:
-  - packages/dashboard/src/components/CostSummary.tsx
-  - packages/dashboard/src/pages/RunDetail.tsx
-  - packages/dashboard/src/pages/ProjectView.tsx (after T5 lands)
-
-  Replace each with "Tokens".
-
-  The footnote `* Input + output. Cache tokens shown in task detail.`
-  stays unchanged — it carries the scope information the "Total" prefix
-  used to imply.
-
-  Do NOT change anything in TaskDetail (per-task view, may have different
-  conventions). Do NOT change CLI strings.
-
-## T8: cost.ts per-project table — print footnote at bottom (Round A regression)
-- STATUS: done
-- FILES: packages/cli/src/commands/cost.ts
-- VERIFY: cd packages/cli && pnpm build && grep -q "Token-based cost" packages/cli/src/commands/cost.ts && node packages/cli/dist/index.js cost 2>&1 | grep -q "Token-based cost"
+## T12: Thread globalConfig into RunContext for audit auth resolution
+- STATUS: pending
+- FILES: packages/cli/src/engine/types.ts, packages/cli/src/commands/run.ts
+- VERIFY: cd packages/cli && pnpm build && grep -q "globalConfig" dist/engine/types.js 2>/dev/null && echo "PASS" || echo "FAIL"
 - CRITIC: skip
-- SPEC: Per Round A audit RISK 6: noxdev cost (per-project table) shows
-  $COST* asterisk column but the footnote explaining it only prints in
-  --global path. The per-project path never prints a footnote so the
-  asterisk is dangling.
-
-  In packages/cli/src/commands/cost.ts find the per-project table renderer.
-  After the TOTAL row, print:
-  `* Token-based cost. Max-mode tasks show equivalent API cost.`
-
-  Also verify the per-run table renderer (used by `noxdev cost <project>`)
-  has the footnote. If not, add it the same way.
-
-  Use the EXACT footnote wording above — match the wording used in the
-  dashboard (T2) so docs/screenshots are consistent.
-
-  The VERIFY gate runs `node ... cost` and greps the actual output for
-  "Token-based cost" — behavioral check, not just source presence.
-
-  Do NOT change the table format or column headers. Do NOT change the
-  --global footnote (it already exists, just with different wording —
-  Round A audit noted the wording mismatch but updating it is in this
-  task too: change cost.ts:383 from
-  `"* Token-based cost combines API and equivalent Max usage costs."`
-  to the EXACT string used everywhere else:
-  `"* Token-based cost. Max-mode tasks show equivalent API cost."`).
-
-## T9: README — document ProjectView and updated CLI footnote wording
-- STATUS: done
-- FILES: README.md
-- VERIFY: grep -q "Project view\|/projects/" README.md && grep -q "Token-based cost. Max-mode tasks show equivalent API cost." README.md
-- CRITIC: skip
-- SPEC: After T5 ships, the dashboard has a new ProjectView page. README's
-  dashboard section should mention it.
-
-  Find the dashboard section in README.md. Add a line documenting:
-  - Click a project name from Overview to see project detail
-  - Project page shows aggregate cost + flat task table with sortable columns
-  - Sort options: cost desc (find expensive tasks), date desc (chronological),
-    duration desc, task ID
-
-  Also: replace any references to the old "Token-based cost combines API and
-  equivalent Max usage costs" footnote wording with the canonical
-  `* Token-based cost. Max-mode tasks show equivalent API cost.`
-
-  Do NOT modify CHANGELOG.md (Round B is also plumbing — version bump waits
-  for a natural release point with user-facing features).
+- SPEC: The orchestrator needs access to globalConfig to call resolveAuditAuth()
+  and read audit settings. Currently RunContext has projectConfig but not
+  globalConfig.
+  1. In packages/cli/src/engine/types.ts, add to RunContext:
+     ```typescript
+     globalConfig: GlobalConfig;
+     ```
+     Import GlobalConfig from config/types.
+  2. In packages/cli/src/commands/run.ts, where RunContext is constructed
+     before calling executeRun(), add globalConfig to the context object.
+     loadGlobalConfig() is likely already called in run.ts — pass its
+     result into the context.
+  If loadGlobalConfig() is not already called in run.ts, add the import
+  and call it. It's a pure function that reads ~/.noxdev/config.json.
+  Do NOT change any other RunContext fields.

@@ -29,6 +29,11 @@ const DEFAULT_GLOBAL_CONFIG: GlobalConfig = {
     global: "",
     age_key: "",
   },
+  audit: {
+    enabled: true,
+    model: "claude-opus-4-6",
+    max_attempts: 3,
+  },
 };
 
 const DEFAULT_PROJECT_CONFIG: ProjectConfig = {
@@ -111,4 +116,5 @@ export function loadProjectConfig(projectPath: string): ProjectConfig {
   return deepMerge(DEFAULT_PROJECT_CONFIG as unknown as Record<string, unknown>, overrides) as unknown as ProjectConfig;
 }
 
+export { DEFAULT_GLOBAL_CONFIG };
 export type { GlobalConfig, ProjectConfig } from "./types.js";
