@@ -74,3 +74,86 @@ Respond with APPROVED or REJECTED followed by a brief explanation.
 If REJECTED, explain what needs to change.
 `;
 }
+
+export function buildAuditFixPrompt(
+  task: ParsedTask,
+  diffContent: string,
+  gapFilePath: string,
+  previousGapAnalysis?: string,
+): string {
+  const preamble = [
+    'CRITICAL CONSTRAINT: The SPEC below is the sole source of truth.',
+    'Do NOT deviate from it. Do NOT improve it. Do NOT reinterpret it.',
+    'If the spec is ambiguous, implement the most literal reading.',
+    'If the spec is impossible, write the reason to the gap analysis file and stop.',
+  ].join('\n');
+
+  let prompt = `${preamble}
+
+You are an autonomous coding agent conducting a comprehensive audit and fix process.
+
+## Task: ${task.taskId} — ${task.title}
+
+## SPEC (sole source of truth):
+${task.spec}
+
+## Current Implementation Diff:
+\`\`\`
+${diffContent}
+\`\`\`
+
+## Your Process:
+
+### Phase 1: AUDIT
+1. Carefully compare the current implementation diff against the SPEC above
+2. Identify every gap, missing requirement, or deviation from the spec
+3. Write a detailed gap analysis to: ${gapFilePath}
+
+### Phase 2: FIX
+1. Read your gap analysis file
+2. Fix ALL identified gaps by modifying the code
+3. Make only the changes needed to satisfy the SPEC exactly
+4. Do not add features not in the SPEC
+5. Do not refactor unrelated code
+
+## Gap Analysis File Format:
+Write to ${gapFilePath} in this format:
+\`\`\`
+# Gap Analysis for ${task.taskId}
+
+## Gaps Found:
+1. [Description of gap 1]
+2. [Description of gap 2]
+...
+
+## Implementation Plan:
+1. [What needs to be changed to fix gap 1]
+2. [What needs to be changed to fix gap 2]
+...
+
+## Status: [GAPS_FOUND | NO_GAPS | IMPOSSIBLE]
+\`\`\``;
+
+  if (previousGapAnalysis) {
+    prompt += `
+
+## Previous Gap Analysis:
+\`\`\`
+${previousGapAnalysis}
+\`\`\`
+Use this to understand what was previously attempted. Focus on any remaining gaps.`;
+  }
+
+  prompt += `
+
+## Rules:
+- The SPEC is absolute truth. Do not question or improve it.
+- Audit first, then fix. Always write the gap analysis file.
+- If SPEC is impossible to implement, explain why in gap analysis and stop.
+- Make only the minimal changes needed to satisfy the SPEC.
+- Commit your changes with message: "noxdev(${task.taskId}): ${task.title}"
+- Do not push to any remote.
+`;
+
+  return prompt;
+}
