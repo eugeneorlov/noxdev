@@ -39,6 +39,10 @@ export function runTaskInDocker(
     args.push(auth.apiKey!);
   }
 
+  // Add model argument as the last argument
+  const modelToUse = options.model ?? auth.model;
+  args.push(modelToUse);
+
   const startTime = Date.now();
 
   try {
