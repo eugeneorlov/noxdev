@@ -1,6 +1,6 @@
 import type { Database } from "../db/connection.js";
 import type { ProjectConfig, GlobalConfig } from "../config/types.js";
-import type { AuthResult } from "../auth/index.js";
+import type { AuthResult, AuthConfig } from "../auth/index.js";
 
 export interface RunContext {
   projectId: string;
@@ -12,6 +12,7 @@ export interface RunContext {
   runId: string;
   db: Database;
   auth: AuthResult;
+  authConfig: AuthConfig;
 }
 
 export interface TaskExecResult {

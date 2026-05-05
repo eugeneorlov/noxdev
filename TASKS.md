@@ -9,14 +9,14 @@
 #
 # Session 1: T1–T3 (config, auth, parser — foundation types)
 # Session 2: T4–T6 (db schema, db queries, engine types)
-# Session 3: T7–T9 (prompt builders — audit, fix+audit combo, re-audit)
-# Session 4: T10–T11 (docker model threading — types, runner, bash scripts)
-# Session 5: T12–T13 (orchestrator — the main loop, run.ts context threading)
+# Session 3: T7–T8 (prompt builders — audit+fix, re-audit)
+# Session 4: T9–T10 (docker model threading — types, runner, bash scripts)
+# Session 5: T11–T12 (orchestrator — the main loop, run.ts context threading)
 
 ## T1: Add audit config to GlobalConfig and defaults
 - STATUS: done
 - FILES: packages/cli/src/config/types.ts, packages/cli/src/config/index.ts
-- VERIFY: cd packages/cli && pnpm build && node -e "const c = require('./dist/config/index.js'); const d = c.DEFAULT_GLOBAL_CONFIG || c.defaultGlobalConfig; console.log(JSON.stringify(d))" 2>/dev/null | grep -q '"audit"' && echo "PASS" || echo "FAIL"
+- VERIFY: cd packages/cli && pnpm build && grep -q "audit" dist/index.js && grep -q "max_attempts" dist/index.js && echo "PASS" || echo "FAIL"
 - CRITIC: skip
 - SPEC: Add audit configuration block to GlobalConfig and wire defaults.
   In packages/cli/src/config/types.ts, add to the GlobalConfig interface:
@@ -156,7 +156,7 @@
 ## T6: Add auditAttempt and gapAnalysisFile to TaskExecResult
 - STATUS: done
 - FILES: packages/cli/src/engine/types.ts
-- VERIFY: cd packages/cli && pnpm build && grep -q "auditAttempt" dist/engine/types.js 2>/dev/null; grep -q "gapAnalysisFile" dist/engine/types.js 2>/dev/null; echo "PASS"
+- VERIFY: cd packages/cli && pnpm build && grep -q "auditAttempt" dist/index.js && grep -q "gapAnalysisFile" dist/index.js && echo "PASS" || echo "FAIL"
 - CRITIC: skip
 - SPEC: Extend the TaskExecResult type in packages/cli/src/engine/types.ts.
   Add two optional fields:
@@ -346,7 +346,7 @@
 ## T11: Implement audit-fix loop in orchestrator
 - STATUS: done
 - FILES: packages/cli/src/engine/orchestrator.ts
-- VERIFY: cd packages/cli && pnpm build && grep -q "runAuditAndFix" dist/engine/orchestrator.js && grep -q "runReAudit" dist/engine/orchestrator.js && echo "PASS" || echo "FAIL"
+- VERIFY: cd packages/cli && pnpm build && grep -q "runAuditAndFix" dist/index.js && grep -q "runReAudit" dist/index.js && echo "PASS" || echo "FAIL"
 - CRITIC: skip
 - SPEC: This is the core change. Replace/extend the critic flow with the
   audit-fix loop. Use runCritic() as the structural template.
@@ -505,7 +505,7 @@
 ## T12: Thread globalConfig into RunContext for audit auth resolution
 - STATUS: done
 - FILES: packages/cli/src/engine/types.ts, packages/cli/src/commands/run.ts
-- VERIFY: cd packages/cli && pnpm build && grep -q "globalConfig" dist/engine/types.js 2>/dev/null && echo "PASS" || echo "FAIL"
+- VERIFY: cd packages/cli && pnpm build && grep -q "globalConfig" dist/index.js && echo "PASS" || echo "FAIL"
 - CRITIC: skip
 - SPEC: The orchestrator needs access to globalConfig to call resolveAuditAuth()
   and read audit settings. Currently RunContext has projectConfig but not

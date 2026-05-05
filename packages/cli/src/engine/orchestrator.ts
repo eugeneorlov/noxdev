@@ -10,7 +10,6 @@ import { updateTaskStatus } from "../parser/status-update.js";
 import { buildTaskPrompt, buildCriticPrompt, buildAuditFixPrompt, buildReAuditPrompt } from "../prompts/builder.js";
 import { runTaskInDocker, captureDiff } from "../docker/runner.js";
 import { resolveAuditAuth } from "../auth/index.js";
-import { loadGlobalConfig } from "../config/index.js";
 import {
   insertRun,
   insertTaskCache,
@@ -417,11 +416,10 @@ async function executeTask(
   let auditAttempt = 0;
   let lastGapFile: string | undefined;
   let lastAuditLog: string | undefined;
-  const globalConfig = loadGlobalConfig();
-  const auditEnabled = task.audit !== 'skip' && (globalConfig.audit?.enabled !== false) && status === "COMPLETED";
+  const auditEnabled = task.audit !== 'skip' && (ctx.globalConfig.audit?.enabled !== false) && status === "COMPLETED";
 
   if (auditEnabled) {
-    const maxAuditAttempts = globalConfig.audit?.max_attempts || 3;
+    const maxAuditAttempts = ctx.globalConfig.audit?.max_attempts || 3;
     let lastGapAnalysis: string | undefined;
 
     for (auditAttempt = 1; auditAttempt <= maxAuditAttempts; auditAttempt++) {
@@ -668,9 +666,12 @@ async function runAuditAndFix(
   const promptFile = join(tmpdir(), `noxdev-audit-fix-prompt-${ctx.runId}-${task.taskId}-${auditAttempt}.md`);
   writeFileSync(promptFile, prompt, 'utf-8');
 
-  // 4. Resolve Opus auth
-  const globalConfig = loadGlobalConfig();
-  const auditAuth = resolveAuditAuth(globalConfig.accounts, globalConfig.audit?.model || 'claude-opus-4-6');
+  // 4. Resolve Opus auth from the threaded auth config
+  const auditModel = ctx.globalConfig.audit?.model || 'claude-opus-4-6';
+  const auditAuth = resolveAuditAuth(ctx.authConfig, auditModel);
+  if (auditAuth.mode !== 'api') {
+    console.log(chalk.yellow(`  ⚠ Audit auth degraded to ${auditAuth.mode} (Opus unavailable without API key)`));
+  }
 
   // 5. Restore credential snapshot before Docker run
   if (existsSync(claudeSnapshot)) {
@@ -690,7 +691,7 @@ async function runAuditAndFix(
       memoryLimit: ctx.projectConfig?.docker?.memory || '4g',
       cpuLimit: ctx.projectConfig?.docker?.cpus || 2,
       dockerImage: 'noxdev-runner:latest',
-      model: globalConfig.audit?.model || 'claude-opus-4-6',
+      model: auditModel,
     },
     auditAuth,
   );
@@ -702,11 +703,16 @@ async function runAuditAndFix(
     // ignore
   }
 
-  // 7. Check if gap file was written and contains NO_GAPS_FOUND
+  if (dockerResult.exitCode !== 0) {
+    console.log(chalk.red(`  ✗ Audit-fix container exited ${dockerResult.exitCode}`));
+  }
+
+  // 7. Check if gap file reports no gaps. Prompt asks the model to write
+  // `## Status: NO_GAPS` (one of GAPS_FOUND | NO_GAPS | IMPOSSIBLE) on its own line.
   let fixed = false;
   if (existsSync(gapFile)) {
     const gaps = readFileSync(gapFile, 'utf-8');
-    fixed = gaps.includes('NO_GAPS_FOUND');
+    fixed = /^##\s*Status:\s*NO_GAPS\b/m.test(gaps);
   }
 
   return { fixed, gapAnalysisFile: gapFile, auditLogFile: auditLog };
@@ -739,9 +745,9 @@ async function runReAudit(
   const promptFile = join(tmpdir(), `noxdev-reaudit-prompt-${ctx.runId}-${task.taskId}-${auditAttempt}.md`);
   writeFileSync(promptFile, prompt, 'utf-8');
 
-  // 4. Resolve Opus auth
-  const globalConfig = loadGlobalConfig();
-  const auditAuth = resolveAuditAuth(globalConfig.accounts, globalConfig.audit?.model || 'claude-opus-4-6');
+  // 4. Resolve Opus auth from the threaded auth config
+  const auditModel = ctx.globalConfig.audit?.model || 'claude-opus-4-6';
+  const auditAuth = resolveAuditAuth(ctx.authConfig, auditModel);
 
   // 5. Restore credential snapshot before Docker run
   if (existsSync(claudeSnapshot)) {
@@ -761,7 +767,7 @@ async function runReAudit(
       memoryLimit: ctx.projectConfig?.docker?.memory || '4g',
       cpuLimit: ctx.projectConfig?.docker?.cpus || 2,
       dockerImage: 'noxdev-runner:latest',
-      model: globalConfig.audit?.model || 'claude-opus-4-6',
+      model: auditModel,
     },
     auditAuth,
   );
@@ -773,11 +779,16 @@ async function runReAudit(
     // ignore
   }
 
-  // 7. Check if re-audit confirms NO_GAPS_FOUND or COMPLIANT
+  if (dockerResult.exitCode !== 0) {
+    console.log(chalk.red(`  ✗ Re-audit container exited ${dockerResult.exitCode}`));
+  }
+
+  // 7. Check re-audit verdict. Prompt asks the model to write
+  // `## Overall Assessment: COMPLIANT` (one of COMPLIANT | NON_COMPLIANT | NEEDS_CLARIFICATION).
   let clean = false;
   if (existsSync(gapFile)) {
     const gaps = readFileSync(gapFile, 'utf-8');
-    clean = gaps.includes('COMPLIANT') || gaps.includes('NO_GAPS_FOUND');
+    clean = /^##\s*Overall Assessment:\s*COMPLIANT\b/m.test(gaps);
   }
 
   return { clean, gapAnalysisFile: gapFile, auditLogFile: auditLog };

@@ -10,6 +10,7 @@ import { getAllProjects, getProject, abortOrphanedRuns } from "../db/queries.js"
 import { loadProjectConfig } from "../config/index.js";
 import { loadGlobalConfig } from "../config/index.js";
 import { resolveAuth } from "../auth/index.js";
+import type { AuthConfig } from "../auth/index.js";
 import { executeRun } from "../engine/orchestrator.js";
 import { parseTasksFromFile } from "../parser/tasks.js";
 import type { RunContext } from "../engine/types.js";
@@ -95,19 +96,24 @@ async function runProject(project: ProjectRow): Promise<void> {
   const projectConfig = loadProjectConfig(project.repo_path);
 
   // Resolve auth
-  const auth = resolveAuth({
+  const authConfig: AuthConfig = {
     max: { preferred: globalConfig.accounts.max.preferred },
     api: {
       fallback: globalConfig.accounts.api.fallback,
       dailyCapUsd: globalConfig.accounts.api.daily_cap_usd,
       model: globalConfig.accounts.api.model,
     },
+    gemini: {
+      fallback: globalConfig.accounts.gemini.fallback,
+      model: globalConfig.accounts.gemini.model,
+    },
     secrets: {
       provider: globalConfig.secrets.provider,
       globalSecretsFile: globalConfig.secrets.global,
       ageKeyFile: globalConfig.secrets.age_key,
     },
-  });
+  };
+  const auth = resolveAuth(authConfig);
 
   const runId = generateRunId();
   const gitDir = join(project.repo_path, ".git");
@@ -145,6 +151,7 @@ async function runProject(project: ProjectRow): Promise<void> {
     runId,
     db,
     auth,
+    authConfig,
   };
 
   await executeRun(ctx);
@@ -177,19 +184,24 @@ export async function runAllProjects(
 
   // Resolve auth once before the loop
   const globalConfig = loadGlobalConfig();
-  const auth = resolveAuth({
+  const authConfig: AuthConfig = {
     max: { preferred: globalConfig.accounts.max.preferred },
     api: {
       fallback: globalConfig.accounts.api.fallback,
       dailyCapUsd: globalConfig.accounts.api.daily_cap_usd,
       model: globalConfig.accounts.api.model,
     },
+    gemini: {
+      fallback: globalConfig.accounts.gemini.fallback,
+      model: globalConfig.accounts.gemini.model,
+    },
     secrets: {
       provider: globalConfig.secrets.provider,
       globalSecretsFile: globalConfig.secrets.global,
       ageKeyFile: globalConfig.secrets.age_key,
     },
-  });
+  };
+  const auth = resolveAuth(authConfig);
 
   const results: Array<{
     displayName: string;
@@ -229,6 +241,7 @@ export async function runAllProjects(
       runId,
       db,
       auth,
+      authConfig,
     };
 
     let completed = 0;
