@@ -658,7 +658,7 @@ async function runAuditAndFix(
   const diffContent = readFileSync(diffFile, 'utf-8');
 
   // 2. Build audit+fix prompt
-  const gapFile = join(taskLogDir, `gap-analysis-T${task.taskId}-attempt-${auditAttempt}.md`);
+  const gapFile = join(taskLogDir, `gap-analysis-${task.taskId}-attempt-${auditAttempt}.md`);
   const prompt = buildAuditFixPrompt(task, diffContent, gapFile, previousGapAnalysis);
 
   // 3. Write prompt to temp file
@@ -731,7 +731,7 @@ async function runReAudit(
   const diffContent = readFileSync(diffFile, 'utf-8');
 
   // 2. Build re-audit prompt (read-only)
-  const gapFile = join(taskLogDir, `reaudit-analysis-T${task.taskId}-attempt-${auditAttempt}.md`);
+  const gapFile = join(taskLogDir, `reaudit-analysis-${task.taskId}-attempt-${auditAttempt}.md`);
   const prompt = buildReAuditPrompt(task, diffContent, previousGapAnalysis, gapFile);
 
   // 3. Write prompt to temp file
