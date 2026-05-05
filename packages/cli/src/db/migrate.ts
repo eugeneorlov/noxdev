@@ -2,7 +2,7 @@ import type { Database } from "./connection.js";
 
 // Schema is inlined for compatibility with tsup bundling.
 // Canonical schema definition lives in schema.sql.
-const SCHEMA = `
+export const SCHEMA = `
 CREATE TABLE IF NOT EXISTS projects (
   id TEXT PRIMARY KEY,
   display_name TEXT NOT NULL,
@@ -59,7 +59,10 @@ CREATE TABLE IF NOT EXISTS task_results (
   cache_write_tokens INTEGER,
   model TEXT,
   auth_mode_cost TEXT,
-  cost_usd REAL
+  cost_usd REAL,
+  audit_attempt     INTEGER,
+  audit_log_file    TEXT,
+  gap_analysis_file TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_runs_project ON runs(project_id);
@@ -330,7 +333,10 @@ export function migrate(db: Database): void {
         cache_write_tokens INTEGER,
         model TEXT,
         auth_mode_cost TEXT,
-        cost_usd REAL
+        cost_usd REAL,
+        audit_attempt     INTEGER,
+        audit_log_file    TEXT,
+        gap_analysis_file TEXT
       );
 
       CREATE INDEX IF NOT EXISTS idx_runs_project ON runs(project_id);
@@ -338,5 +344,18 @@ export function migrate(db: Database): void {
       CREATE INDEX IF NOT EXISTS idx_task_results_status ON task_results(status);
       CREATE INDEX IF NOT EXISTS idx_task_results_started ON task_results(started_at);
     `);
+  }
+
+  // Audit-fix loop columns (v1.4.0)
+  const taskResultCols = db.prepare("PRAGMA table_info('task_results')").all() as Array<{name: string}>;
+  const colNames = taskResultCols.map(c => c.name);
+  if (!colNames.includes('audit_attempt')) {
+    db.exec("ALTER TABLE task_results ADD COLUMN audit_attempt INTEGER");
+  }
+  if (!colNames.includes('audit_log_file')) {
+    db.exec("ALTER TABLE task_results ADD COLUMN audit_log_file TEXT");
+  }
+  if (!colNames.includes('gap_analysis_file')) {
+    db.exec("ALTER TABLE task_results ADD COLUMN gap_analysis_file TEXT");
   }
 }
