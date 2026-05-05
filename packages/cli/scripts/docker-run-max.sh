@@ -3,7 +3,7 @@
 #
 # Usage:
 #   docker-run-max.sh <prompt_file> <task_log> <timeout_seconds> <worktree_dir> \
-#     <project_git_dir> <git_target_path> <memory_limit> <cpu_limit> <docker_image>
+#     <project_git_dir> <git_target_path> <memory_limit> <cpu_limit> <docker_image> [model]
 #
 # Arguments:
 #   $1  prompt_file      Path to the prompt markdown file
@@ -15,6 +15,7 @@
 #   $7  memory_limit      Docker memory limit (e.g., 2g)
 #   $8  cpu_limit          Docker CPU limit (e.g., 2)
 #   $9  docker_image      Docker image to use
+#   $10 model             Claude model to use (default: claude-sonnet-4-20250514)
 
 set -euo pipefail
 
@@ -24,9 +25,9 @@ if [ -f "$CRED_SNAPSHOT" ]; then
   cp "$CRED_SNAPSHOT" "$HOME/.claude.json"
 fi
 
-if [ "$#" -ne 9 ]; then
-  echo "Error: expected 9 arguments, got $#" >&2
-  echo "Usage: docker-run-max.sh <prompt_file> <task_log> <timeout_seconds> <worktree_dir> <project_git_dir> <git_target_path> <memory_limit> <cpu_limit> <docker_image>" >&2
+if [ "$#" -ne 9 ] && [ "$#" -ne 10 ]; then
+  echo "Error: expected 9 or 10 arguments, got $#" >&2
+  echo "Usage: docker-run-max.sh <prompt_file> <task_log> <timeout_seconds> <worktree_dir> <project_git_dir> <git_target_path> <memory_limit> <cpu_limit> <docker_image> [model]" >&2
   exit 1
 fi
 
@@ -39,6 +40,7 @@ git_target_path="$6"  # reserved
 memory_limit="$7"
 cpu_limit="$8"
 docker_image="$9"
+model="${10:-claude-sonnet-4-20250514}"
 
 HOST_UID=$(id -u)
 HOST_GID=$(id -g)
@@ -53,5 +55,5 @@ timeout "$timeout_seconds" docker run --rm \
     --user "$HOST_UID":"$HOST_GID" \
     -v "$prompt_file":/tmp/task-prompt.txt:ro \
     "$docker_image" \
-    bash -c 'git config user.name "noxdev" && git config user.email "noxdev@local" && claude -p "$(cat /tmp/task-prompt.txt)" --dangerously-skip-permissions --model claude-sonnet-4-20250514 --effort high' \
+    bash -c 'git config user.name "noxdev" && git config user.email "noxdev@local" && claude -p "$(cat /tmp/task-prompt.txt)" --dangerously-skip-permissions --model '"$model"' --effort high' \
     > "$task_log" 2>&1
