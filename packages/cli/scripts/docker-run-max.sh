@@ -51,6 +51,7 @@ timeout "$timeout_seconds" docker run --rm \
     -v "$worktree_dir":/workspace \
     -v "$project_git_dir":"$git_target_path" \
     -v ~/.claude:/tmp/.claude \
+    -v ~/.claude.json:/tmp/.claude.json \
     -e HOME=/tmp \
     --user "$HOST_UID":"$HOST_GID" \
     -v "$prompt_file":/tmp/task-prompt.txt:ro \
