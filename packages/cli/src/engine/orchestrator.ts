@@ -9,7 +9,6 @@ import type { ParsedTask } from "../parser/tasks.js";
 import { updateTaskStatus } from "../parser/status-update.js";
 import { buildTaskPrompt, buildCriticPrompt, buildAuditFixPrompt, buildReAuditPrompt } from "../prompts/builder.js";
 import { runTaskInDocker, captureDiff } from "../docker/runner.js";
-import { resolveAuditAuth } from "../auth/index.js";
 import {
   insertRun,
   insertTaskCache,
@@ -666,19 +665,13 @@ async function runAuditAndFix(
   const promptFile = join(tmpdir(), `noxdev-audit-fix-prompt-${ctx.runId}-${task.taskId}-${auditAttempt}.md`);
   writeFileSync(promptFile, prompt, 'utf-8');
 
-  // 4. Resolve Opus auth from the threaded auth config
-  const auditModel = ctx.globalConfig.audit?.model || 'claude-opus-4-6';
-  const auditAuth = resolveAuditAuth(ctx.authConfig, auditModel);
-  if (auditAuth.mode !== 'api') {
-    console.log(chalk.yellow(`  ⚠ Audit auth degraded to ${auditAuth.mode} (Opus unavailable without API key)`));
-  }
-
-  // 5. Restore credential snapshot before Docker run
+  // 4. Restore credential snapshot before Docker run
   if (existsSync(claudeSnapshot)) {
     copyFileSync(claudeSnapshot, claudeJsonSrc);
   }
 
-  // 6. Run Docker with Opus model
+  // 5. Run Docker with Opus model under the same Max auth as the dev pass
+  const auditModel = ctx.globalConfig.audit?.model || 'claude-opus-4-6';
   const auditLog = join(taskLogDir, `audit-fix-attempt-${auditAttempt}.log`);
   const dockerResult = runTaskInDocker(
     {
@@ -693,7 +686,7 @@ async function runAuditAndFix(
       dockerImage: 'noxdev-runner:latest',
       model: auditModel,
     },
-    auditAuth,
+    ctx.auth,
   );
 
   // Clean up prompt file
@@ -745,16 +738,13 @@ async function runReAudit(
   const promptFile = join(tmpdir(), `noxdev-reaudit-prompt-${ctx.runId}-${task.taskId}-${auditAttempt}.md`);
   writeFileSync(promptFile, prompt, 'utf-8');
 
-  // 4. Resolve Opus auth from the threaded auth config
-  const auditModel = ctx.globalConfig.audit?.model || 'claude-opus-4-6';
-  const auditAuth = resolveAuditAuth(ctx.authConfig, auditModel);
-
-  // 5. Restore credential snapshot before Docker run
+  // 4. Restore credential snapshot before Docker run
   if (existsSync(claudeSnapshot)) {
     copyFileSync(claudeSnapshot, claudeJsonSrc);
   }
 
-  // 6. Run Docker with Opus model (separate container for clean eyes)
+  // 5. Run Docker with Opus model (separate container for clean eyes)
+  const auditModel = ctx.globalConfig.audit?.model || 'claude-opus-4-6';
   const auditLog = join(taskLogDir, `reaudit-attempt-${auditAttempt}.log`);
   const dockerResult = runTaskInDocker(
     {
@@ -769,7 +759,7 @@ async function runReAudit(
       dockerImage: 'noxdev-runner:latest',
       model: auditModel,
     },
-    auditAuth,
+    ctx.auth,
   );
 
   // Clean up prompt file
