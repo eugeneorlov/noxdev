@@ -1,10 +1,11 @@
 import type { Database } from "../db/connection.js";
-import type { ProjectConfig } from "../config/types.js";
+import type { ProjectConfig, GlobalConfig } from "../config/types.js";
 import type { AuthResult } from "../auth/index.js";
 
 export interface RunContext {
   projectId: string;
   projectConfig: ProjectConfig;
+  globalConfig: GlobalConfig;
   worktreeDir: string;
   projectGitDir: string;
   gitTargetPath: string;

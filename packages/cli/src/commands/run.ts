@@ -138,6 +138,7 @@ async function runProject(project: ProjectRow): Promise<void> {
   const ctx: RunContext = {
     projectId: project.id,
     projectConfig,
+    globalConfig,
     worktreeDir: project.worktree_path,
     projectGitDir: gitDir,
     gitTargetPath: gitDir,
@@ -221,6 +222,7 @@ export async function runAllProjects(
     const ctx: RunContext = {
       projectId: proj.id,
       projectConfig,
+      globalConfig,
       worktreeDir: proj.worktree_path,
       projectGitDir: gitDir,
       gitTargetPath: gitDir,
