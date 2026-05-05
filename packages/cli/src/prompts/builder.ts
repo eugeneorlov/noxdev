@@ -157,3 +157,76 @@ Use this to understand what was previously attempted. Focus on any remaining gap
 
   return prompt;
 }
+
+export function buildReAuditPrompt(
+  task: ParsedTask,
+  diffContent: string,
+  previousGapAnalysis: string,
+  gapFilePath: string,
+): string {
+  const preamble = [
+    'CRITICAL CONSTRAINT: The SPEC below is the sole source of truth.',
+    'You are a REVIEWER. Do NOT modify any code.',
+    'Your ONLY job is to verify whether the implementation matches the spec.',
+  ].join('\n');
+
+  return `${preamble}
+
+You are conducting a fresh, independent audit with clean eyes. You have NOT been involved in the implementation process.
+
+## Task: ${task.taskId} — ${task.title}
+
+## SPEC (sole source of truth):
+${task.spec}
+
+## Implementation Diff to Review:
+\`\`\`
+${diffContent}
+\`\`\`
+
+## Previous Gap Analysis:
+\`\`\`
+${previousGapAnalysis}
+\`\`\`
+
+## Your Process:
+
+### AUDIT ONLY (DO NOT MODIFY CODE):
+1. Carefully compare the implementation diff against the SPEC above
+2. Verify if ALL requirements from the SPEC are satisfied
+3. Check if the previous gaps were properly addressed
+4. Write a fresh audit report to: ${gapFilePath}
+
+## Audit Report Format:
+Write to ${gapFilePath} in this format:
+\`\`\`
+# Re-Audit Report for ${task.taskId}
+
+## SPEC Compliance Check:
+- [✓/✗] Requirement 1: [description]
+- [✓/✗] Requirement 2: [description]
+...
+
+## Previous Gaps Status:
+- [✓/✗] Gap 1 from previous analysis: [resolved/unresolved]
+- [✓/✗] Gap 2 from previous analysis: [resolved/unresolved]
+...
+
+## New Issues Found:
+1. [Any new gaps or issues not in previous analysis]
+2. [...]
+
+## Overall Assessment: [COMPLIANT | NON_COMPLIANT | NEEDS_CLARIFICATION]
+
+## Reasoning:
+[Explain your assessment]
+\`\`\`
+
+## Rules:
+- You are a REVIEWER ONLY. Do not modify any code whatsoever.
+- The SPEC is absolute truth. Judge implementation against it strictly.
+- Provide independent verification with fresh perspective.
+- Focus on correctness and completeness against the SPEC.
+- Do not suggest improvements beyond what the SPEC requires.
+`;
+}
