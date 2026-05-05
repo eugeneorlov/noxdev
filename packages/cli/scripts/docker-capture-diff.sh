@@ -32,23 +32,51 @@ pre_task_sha="$3"
 
 cd "$worktree_dir"
 
-# Stage untracked files as intent-to-add so they appear in git diff
-git add -N . 2>/dev/null || true
+# Defensive excludes: even if the project's .gitignore is missing common build-artifact
+# patterns, never let dependency stores or build outputs leak into the diff. Otherwise
+# the prompt embedding the diff explodes (e.g. .pnpm-store can be hundreds of MB).
+EXCLUDES=(
+  ":(exclude,glob)**/node_modules/**"
+  ":(exclude,glob)**/.pnpm-store/**"
+  ":(exclude,glob)**/.next/**"
+  ":(exclude,glob)**/dist/**"
+  ":(exclude,glob)**/build/**"
+  ":(exclude,glob)**/.turbo/**"
+  ":(exclude,glob)**/coverage/**"
+  ":(exclude,glob)**/.cache/**"
+)
+
+LSFILES_EXCLUDES=(
+  --exclude=node_modules
+  --exclude=.pnpm-store
+  --exclude=.next
+  --exclude=dist
+  --exclude=build
+  --exclude=.turbo
+  --exclude=coverage
+  --exclude=.cache
+)
+
+# Stage untracked files as intent-to-add so they appear in git diff, but skip the
+# excluded paths so we don't pull artifact stores into the patch.
+while IFS= read -r f; do
+  [ -n "$f" ] && git add -N -- "$f" 2>/dev/null || true
+done < <(git ls-files --others --exclude-standard "${LSFILES_EXCLUDES[@]}")
 
 {
 echo "---COMMITTED---"
 # Diff from pre-task baseline to current HEAD — this is the agent's committed work.
 # If pre_task_sha == HEAD (agent committed nothing), this diff is empty.
 if [ "$pre_task_sha" != "$(git rev-parse HEAD)" ]; then
-git diff "$pre_task_sha..HEAD" || true
+git diff "$pre_task_sha..HEAD" -- . "${EXCLUDES[@]}" || true
 fi
 echo "---UNCOMMITTED---"
 # Any uncommitted work the agent left in the worktree (rare but possible).
-git diff HEAD || true
+git diff HEAD -- . "${EXCLUDES[@]}" || true
 echo "---STAGED---"
-git diff --cached || true
+git diff --cached -- . "${EXCLUDES[@]}" || true
 echo "---UNTRACKED---"
-git ls-files --others --exclude-standard | while IFS= read -r f; do
+git ls-files --others --exclude-standard "${LSFILES_EXCLUDES[@]}" | while IFS= read -r f; do
 echo "=== $f ==="
 cat "$f" 2>/dev/null || true
 done

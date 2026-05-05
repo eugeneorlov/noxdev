@@ -56,5 +56,5 @@ timeout "$timeout_seconds" docker run --rm \
     --user "$HOST_UID":"$HOST_GID" \
     -v "$prompt_file":/tmp/task-prompt.txt:ro \
     "$docker_image" \
-    bash -c 'git config user.name "noxdev" && git config user.email "noxdev@local" && claude -p "$(cat /tmp/task-prompt.txt)" --dangerously-skip-permissions --model '"$model"' --effort high' \
+    bash -c 'git config user.name "noxdev" && git config user.email "noxdev@local" && claude -p --dangerously-skip-permissions --model '"$model"' --effort high < /tmp/task-prompt.txt' \
     > "$task_log" 2>&1

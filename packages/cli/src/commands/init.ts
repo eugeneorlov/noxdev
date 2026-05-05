@@ -170,6 +170,12 @@ async function runInit(project: string, repoPath: string, overrideType?: string)
     throw err;
   }
 
+  // 2.5 Ensure the worktree's .gitignore excludes dependency stores and build
+  // artifacts. Without this, `pnpm install` etc. produce hundreds of MB of
+  // untracked files that get swept into the audit-fix prompt and blow past the
+  // shell ARG_MAX when invoking the agent.
+  ensureWorktreeGitignore(worktreePath);
+
   // 3. Create .noxdev/config.json with auto-detected commands
   const projectType = getProjectType(resolvedRepo, overrideType);
   const detected = detectCommands(resolvedRepo, projectType);
@@ -280,4 +286,59 @@ async function runInit(project: string, repoPath: string, overrideType?: string)
     chalk.blue("→") +
       ` Write tasks in ${worktreePath}/TASKS.md then run: ${chalk.bold(`noxdev run ${project}`)}`,
   );
+}
+
+const REQUIRED_GITIGNORE_PATTERNS = [
+  "node_modules/",
+  ".pnpm-store/",
+  ".next/",
+  "dist/",
+  "build/",
+  ".turbo/",
+  "coverage/",
+  ".cache/",
+];
+
+function ensureWorktreeGitignore(worktreePath: string): void {
+  if (!existsSync(worktreePath)) return;
+
+  const gitignorePath = join(worktreePath, ".gitignore");
+  const existing = existsSync(gitignorePath)
+    ? readFileSync(gitignorePath, "utf-8")
+    : "";
+
+  const lines = existing.split(/\r?\n/);
+  const present = new Set(lines.map((l) => l.trim()).filter(Boolean));
+
+  const missing = REQUIRED_GITIGNORE_PATTERNS.filter((p) => !present.has(p));
+  if (missing.length === 0) return;
+
+  const needsLeadingNewline = existing.length > 0 && !existing.endsWith("\n");
+  const block =
+    (needsLeadingNewline ? "\n" : "") +
+    (existing.length > 0 ? "\n# Added by noxdev init\n" : "# Added by noxdev init\n") +
+    missing.join("\n") +
+    "\n";
+
+  writeFileSync(gitignorePath, existing + block);
+
+  try {
+    execSync("git add .gitignore", { cwd: worktreePath, stdio: "pipe" });
+    execSync('git commit -m "noxdev: ensure build artifacts ignored"', {
+      cwd: worktreePath,
+      stdio: "pipe",
+    });
+    console.log(
+      chalk.green("✓") +
+        ` .gitignore updated (added: ${missing.join(", ")})`,
+    );
+  } catch {
+    // If commit fails (e.g. nothing actually staged because of a hook), leave
+    // the file change in place; the diff-capture defensive excludes still
+    // protect us.
+    console.log(
+      chalk.yellow("⚠") +
+        ` .gitignore patterns appended but not committed (missing: ${missing.join(", ")})`,
+    );
+  }
 }

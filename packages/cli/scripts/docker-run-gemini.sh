@@ -49,5 +49,5 @@ timeout "$timeout_seconds" docker run --rm \
     -e HOME=/tmp \
     --user "$HOST_UID":"$HOST_GID" \
     "$docker_image" \
-    bash -c 'git config user.name "noxdev" && git config user.email "noxdev@local" && gemini "$(cat /tmp/task-prompt.txt)"' \
+    bash -c 'git config user.name "noxdev" && git config user.email "noxdev@local" && gemini < /tmp/task-prompt.txt' \
     > "$task_log" 2>&1

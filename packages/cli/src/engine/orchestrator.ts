@@ -435,6 +435,19 @@ async function executeTask(
         break;
       }
 
+      // The audit container may have failed before producing a gap-analysis
+      // file (e.g. exec error, OOM, timeout). Without it we can't seed the
+      // re-audit, so treat the attempt as failed and stop the loop.
+      if (!existsSync(auditResult.gapAnalysisFile)) {
+        console.log(
+          chalk.red(
+            `  ✗ Audit attempt ${auditAttempt} produced no gap analysis (container exited abnormally) — aborting audit loop`,
+          ),
+        );
+        status = "FAILED";
+        break;
+      }
+
       // Run re-audit (clean eyes)
       const reauditResult = await runReAudit(
         ctx, task, logDir, auditAttempt,
@@ -445,6 +458,18 @@ async function executeTask(
       if (reauditResult.clean) {
         // All gaps fixed, done
         console.log(chalk.green(`  ✓ Re-audit confirms gaps resolved in attempt ${auditAttempt}`));
+        lastGapFile = reauditResult.gapAnalysisFile;
+        break;
+      }
+
+      // Same defense for the re-audit container.
+      if (!existsSync(reauditResult.gapAnalysisFile)) {
+        console.log(
+          chalk.red(
+            `  ✗ Re-audit attempt ${auditAttempt} produced no analysis (container exited abnormally) — aborting audit loop`,
+          ),
+        );
+        status = "FAILED";
         lastGapFile = reauditResult.gapAnalysisFile;
         break;
       }
