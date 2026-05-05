@@ -344,7 +344,7 @@
   timeout handling, credential restore.
 
 ## T11: Implement audit-fix loop in orchestrator
-- STATUS: pending
+- STATUS: done
 - FILES: packages/cli/src/engine/orchestrator.ts
 - VERIFY: cd packages/cli && pnpm build && grep -q "runAuditAndFix" dist/engine/orchestrator.js && grep -q "runReAudit" dist/engine/orchestrator.js && echo "PASS" || echo "FAIL"
 - CRITIC: skip
@@ -503,7 +503,7 @@
      the new auditAttempt, auditLogFile, gapAnalysisFile fields.
 
 ## T12: Thread globalConfig into RunContext for audit auth resolution
-- STATUS: pending
+- STATUS: done
 - FILES: packages/cli/src/engine/types.ts, packages/cli/src/commands/run.ts
 - VERIFY: cd packages/cli && pnpm build && grep -q "globalConfig" dist/engine/types.js 2>/dev/null && echo "PASS" || echo "FAIL"
 - CRITIC: skip
