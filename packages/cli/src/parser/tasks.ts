@@ -7,11 +7,12 @@ export interface ParsedTask {
   files: string[];
   verify: string;
   critic: string;
+  audit?: 'skip' | 'enabled';
   spec: string;
 }
 
 const TASK_HEADER_RE = /^## (T\d+): (.+)$/;
-const FIELD_RE = /^- (STATUS|FILES|VERIFY|CRITIC|SPEC): (.+)$/i;
+const FIELD_RE = /^- (STATUS|FILES|VERIFY|CRITIC|AUDIT|SPEC): (.+)$/i;
 
 export function parseTasks(
   content: string,
@@ -74,6 +75,9 @@ export function parseTasks(
           break;
         case 'CRITIC':
           current.critic = value.trim();
+          break;
+        case 'AUDIT':
+          current.audit = value.trim().toLowerCase() as 'skip' | 'enabled';
           break;
         case 'SPEC':
           current.spec = value.trimEnd();
