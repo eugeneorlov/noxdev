@@ -108,6 +108,9 @@ export function insertTaskResult(
     model?: string | null;
     authModeCost?: string;
     costUsd?: number;
+    auditAttempt?: number | null;
+    auditLogFile?: string | null;
+    gapAnalysisFile?: string | null;
   },
 ): void {
   db.prepare(
@@ -116,8 +119,8 @@ export function insertTaskResult(
       attempt, commit_sha, started_at, finished_at, duration_seconds,
       dev_log_file, critic_log_file, diff_file,
       input_tokens, output_tokens, cache_read_tokens, cache_write_tokens,
-      model, auth_mode_cost, cost_usd)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      model, auth_mode_cost, cost_usd, audit_attempt, audit_log_file, gap_analysis_file)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     result.runId,
     result.taskId,
@@ -141,6 +144,9 @@ export function insertTaskResult(
     result.model ?? null,
     result.authModeCost ?? null,
     result.costUsd ?? null,
+    result.auditAttempt ?? null,
+    result.auditLogFile ?? null,
+    result.gapAnalysisFile ?? null,
   );
 }
 
