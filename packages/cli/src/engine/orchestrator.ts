@@ -316,6 +316,7 @@ async function executeTask(
     {
       promptFile,
       taskLog,
+      taskLogDir,
       timeoutSeconds,
       worktreeDir: ctx.worktreeDir,
       projectGitDir: ctx.projectGitDir,
@@ -617,6 +618,7 @@ async function runCritic(
     {
       promptFile: criticPromptFile,
       taskLog: criticLog,
+      taskLogDir,
       timeoutSeconds: 120,
       worktreeDir: ctx.worktreeDir,
       projectGitDir: ctx.projectGitDir,
@@ -702,6 +704,7 @@ async function runAuditAndFix(
     {
       promptFile,
       taskLog: auditLog,
+      taskLogDir,
       timeoutSeconds: ctx.projectConfig?.docker?.timeout_minutes ? ctx.projectConfig.docker.timeout_minutes * 60 : 1800,
       worktreeDir: ctx.worktreeDir,
       projectGitDir: ctx.projectGitDir,
@@ -775,6 +778,7 @@ async function runReAudit(
     {
       promptFile,
       taskLog: auditLog,
+      taskLogDir,
       timeoutSeconds: ctx.projectConfig?.docker?.timeout_minutes ? ctx.projectConfig.docker.timeout_minutes * 60 : 1800,
       worktreeDir: ctx.worktreeDir,
       projectGitDir: ctx.projectGitDir,

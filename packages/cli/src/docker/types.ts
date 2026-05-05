@@ -1,6 +1,7 @@
 export interface DockerRunOptions {
   promptFile: string;
   taskLog: string;
+  taskLogDir: string;
   timeoutSeconds: number;
   worktreeDir: string;
   projectGitDir: string;

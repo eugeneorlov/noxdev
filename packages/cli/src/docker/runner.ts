@@ -33,6 +33,7 @@ export function runTaskInDocker(
     options.memoryLimit,
     String(options.cpuLimit),
     options.dockerImage,
+    options.taskLogDir,
   ];
 
   if (auth.mode === "api" || auth.mode === "gemini") {
