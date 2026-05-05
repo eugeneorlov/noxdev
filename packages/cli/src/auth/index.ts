@@ -13,7 +13,7 @@ export interface AuthResult {
 
 export interface AuthConfig {
   max: { preferred: boolean };
-  api: { fallback: boolean; dailyCapUsd: number; model: string };
+  api: { fallback: boolean; dailyCapUsd: number; model: string; key?: string };
   gemini: { fallback: boolean; model: string };
   secrets: { provider: string; globalSecretsFile: string; ageKeyFile: string };
 }
@@ -61,4 +61,25 @@ export function resolveAuth(config: AuthConfig): AuthResult {
   throw new Error(
     "No auth available. Max credentials not found at ~/.claude.json, and API/Gemini fallback is disabled or decryption failed.",
   );
+}
+
+export function resolveAuditAuth(config: AuthConfig, auditModel: string): AuthResult {
+  // Audit always runs via API with the specified model (Opus).
+  // Max plan does not support Opus model selection, so we force API mode.
+  if (config.api?.fallback && config.api?.key) {
+    return {
+      mode: 'api' as AuthMode,
+      apiKey: config.api.key,
+      model: auditModel,
+    };
+  }
+  // If no API key configured, fall back to max with default model.
+  // This is degraded mode — Opus won't be used, but execution continues.
+  if (isMaxAvailable()) {
+    return {
+      mode: 'max' as AuthMode,
+      model: auditModel,
+    };
+  }
+  throw new Error('Audit requires API key for Opus model. Configure api.key in ~/.noxdev/config.json');
 }
