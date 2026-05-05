@@ -21,4 +21,6 @@ export interface TaskExecResult {
   commitSha: string | null;
   durationSeconds: number;
   attempt: number;
+  auditAttempt?: number;
+  gapAnalysisFile?: string | null;
 }
