@@ -14,7 +14,7 @@
 # Session 5: T12–T13 (orchestrator — the main loop, run.ts context threading)
 
 ## T1: Add audit config to GlobalConfig and defaults
-- STATUS: pending
+- STATUS: done
 - FILES: packages/cli/src/config/types.ts, packages/cli/src/config/index.ts
 - VERIFY: cd packages/cli && pnpm build && node -e "const c = require('./dist/config/index.js'); const d = c.DEFAULT_GLOBAL_CONFIG || c.defaultGlobalConfig; console.log(JSON.stringify(d))" 2>/dev/null | grep -q '"audit"' && echo "PASS" || echo "FAIL"
 - CRITIC: skip
@@ -40,7 +40,7 @@
   Do NOT change any other config fields or defaults.
 
 ## T2: Add resolveAuditAuth to auth module
-- STATUS: pending
+- STATUS: done
 - FILES: packages/cli/src/auth/index.ts
 - VERIFY: cd packages/cli && pnpm build && node -e "const a = require('./dist/auth/index.js'); console.log(typeof a.resolveAuditAuth)" 2>/dev/null | grep -q "function" && echo "PASS" || echo "FAIL"
 - CRITIC: skip
@@ -73,7 +73,7 @@
   Do NOT modify resolveAuth() or any other existing function.
 
 ## T3: Add AUDIT field to TASKS.md parser
-- STATUS: pending
+- STATUS: done
 - FILES: packages/cli/src/parser/tasks.ts
 - VERIFY: cd packages/cli && pnpm build && node -e "const p = require('./dist/parser/tasks.js'); const r = p.parseTasks('## T1: Test\n- STATUS: pending\n- FILES: foo.ts\n- VERIFY: echo ok\n- CRITIC: skip\n- AUDIT: skip\n- SPEC: do thing\n'); console.log(r[0].audit)" 2>/dev/null | grep -q "skip" && echo "PASS" || echo "FAIL"
 - CRITIC: skip
@@ -100,7 +100,7 @@
   Do NOT change any other parser behavior, field ordering, or regex structure.
 
 ## T4: Add audit columns to SQLite schema and migration
-- STATUS: pending
+- STATUS: done
 - FILES: packages/cli/src/db/migrate.ts
 - VERIFY: cd packages/cli && pnpm build && node -e "const m = require('./dist/db/migrate.js'); const s = m.SCHEMA || ''; console.log(s)" 2>/dev/null | grep -q "audit_attempt" && echo "PASS" || echo "FAIL"
 - CRITIC: skip
@@ -133,7 +133,7 @@
   Do NOT modify any existing columns or migration logic.
 
 ## T5: Extend insertTaskResult with audit fields
-- STATUS: pending
+- STATUS: done
 - FILES: packages/cli/src/db/queries.ts
 - VERIFY: cd packages/cli && pnpm build && grep -q "audit_attempt" dist/db/queries.js && grep -q "gap_analysis_file" dist/db/queries.js && echo "PASS" || echo "FAIL"
 - CRITIC: skip
@@ -154,7 +154,7 @@
   Preserve the existing parameter ordering — add new params at the end.
 
 ## T6: Add auditAttempt and gapAnalysisFile to TaskExecResult
-- STATUS: pending
+- STATUS: done
 - FILES: packages/cli/src/engine/types.ts
 - VERIFY: cd packages/cli && pnpm build && grep -q "auditAttempt" dist/engine/types.js 2>/dev/null; grep -q "gapAnalysisFile" dist/engine/types.js 2>/dev/null; echo "PASS"
 - CRITIC: skip
@@ -167,7 +167,7 @@
   Do NOT change RunContext or any other types in this file.
 
 ## T7: Build audit+fix prompt builder
-- STATUS: pending
+- STATUS: done
 - FILES: packages/cli/src/prompts/builder.ts
 - VERIFY: cd packages/cli && pnpm build && node -e "const b = require('./dist/prompts/builder.js'); console.log(typeof b.buildAuditFixPrompt)" 2>/dev/null | grep -q "function" && echo "PASS" || echo "FAIL"
 - CRITIC: skip
@@ -238,7 +238,7 @@
   function alongside existing exports.
 
 ## T8: Build re-audit prompt builder
-- STATUS: pending
+- STATUS: done
 - FILES: packages/cli/src/prompts/builder.ts
 - VERIFY: cd packages/cli && pnpm build && node -e "const b = require('./dist/prompts/builder.js'); console.log(typeof b.buildReAuditPrompt)" 2>/dev/null | grep -q "function" && echo "PASS" || echo "FAIL"
 - CRITIC: skip
@@ -297,7 +297,7 @@
   Do NOT modify any existing prompt builders. Export alongside existing exports.
 
 ## T9: Add model arg to Docker types and runner
-- STATUS: pending
+- STATUS: done
 - FILES: packages/cli/src/docker/types.ts, packages/cli/src/docker/runner.ts
 - VERIFY: cd packages/cli && pnpm build && grep -q "model" dist/docker/types.js 2>/dev/null && grep "model" dist/docker/runner.js | head -3 && echo "PASS" || echo "FAIL"
 - CRITIC: skip
@@ -319,7 +319,7 @@
   flows through the existing options object.
 
 ## T10: Add model arg to bash Docker scripts
-- STATUS: pending
+- STATUS: done
 - FILES: packages/cli/scripts/docker-run-max.sh, packages/cli/scripts/docker-run-api.sh
 - VERIFY: cd packages/cli && grep -q 'model=' scripts/docker-run-max.sh && grep -q 'model=' scripts/docker-run-api.sh && grep -q '"$model"' scripts/docker-run-max.sh && echo "PASS" || echo "FAIL"
 - CRITIC: skip

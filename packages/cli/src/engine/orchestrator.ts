@@ -7,8 +7,10 @@ import type { RunContext, TaskExecResult } from "./types.js";
 import { parseTasksFromFile } from "../parser/tasks.js";
 import type { ParsedTask } from "../parser/tasks.js";
 import { updateTaskStatus } from "../parser/status-update.js";
-import { buildTaskPrompt, buildCriticPrompt } from "../prompts/builder.js";
+import { buildTaskPrompt, buildCriticPrompt, buildAuditFixPrompt, buildReAuditPrompt } from "../prompts/builder.js";
 import { runTaskInDocker, captureDiff } from "../docker/runner.js";
+import { resolveAuditAuth } from "../auth/index.js";
+import { loadGlobalConfig } from "../config/index.js";
 import {
   insertRun,
   insertTaskCache,
@@ -411,6 +413,61 @@ async function executeTask(
     }
   }
 
+  // Audit-fix loop (if enabled and status is COMPLETED)
+  let auditAttempt = 0;
+  let lastGapFile: string | undefined;
+  let lastAuditLog: string | undefined;
+  const globalConfig = loadGlobalConfig();
+  const auditEnabled = task.audit !== 'skip' && (globalConfig.audit?.enabled !== false) && status === "COMPLETED";
+
+  if (auditEnabled) {
+    const maxAuditAttempts = globalConfig.audit?.max_attempts || 3;
+    let lastGapAnalysis: string | undefined;
+
+    for (auditAttempt = 1; auditAttempt <= maxAuditAttempts; auditAttempt++) {
+      // Run audit + fix
+      const auditResult = await runAuditAndFix(
+        ctx, task, logDir, auditAttempt,
+        claudeJsonSrc, claudeSnapshot, lastSha, lastGapAnalysis,
+      );
+      lastGapFile = auditResult.gapAnalysisFile;
+      lastAuditLog = auditResult.auditLogFile;
+
+      if (auditResult.fixed) {
+        console.log(chalk.green(`  ✓ Audit + fix completed in attempt ${auditAttempt}`));
+        break;
+      }
+
+      // Run re-audit (clean eyes)
+      const reauditResult = await runReAudit(
+        ctx, task, logDir, auditAttempt,
+        claudeJsonSrc, claudeSnapshot, lastSha,
+        readFileSync(auditResult.gapAnalysisFile, 'utf-8'),
+      );
+
+      if (reauditResult.clean) {
+        // All gaps fixed, done
+        console.log(chalk.green(`  ✓ Re-audit confirms gaps resolved in attempt ${auditAttempt}`));
+        lastGapFile = reauditResult.gapAnalysisFile;
+        break;
+      }
+
+      // Feed re-audit gap analysis back into next attempt
+      lastGapAnalysis = readFileSync(reauditResult.gapAnalysisFile, 'utf-8');
+      lastGapFile = reauditResult.gapAnalysisFile;
+
+      if (auditAttempt < maxAuditAttempts) {
+        console.log(chalk.yellow(`  ⚠ Audit attempt ${auditAttempt} found remaining gaps, retrying...`));
+      }
+    }
+
+    if (auditAttempt > maxAuditAttempts) {
+      // Mark as failed — existing circuit breaker handles run-level abort
+      status = "FAILED";
+      console.log(chalk.red(`  ✗ Audit-fix loop failed after ${maxAuditAttempts} attempts`));
+    }
+  }
+
   const finishedAt = isoNow();
 
   // Capture token usage and cost from the Claude Code session JSONL
@@ -440,6 +497,9 @@ async function executeTask(
     model: costData.model,
     authModeCost: costData.auth_mode_cost,
     costUsd: costData.cost_usd,
+    auditAttempt: auditAttempt > 0 ? auditAttempt : null,
+    auditLogFile: lastAuditLog || null,
+    gapAnalysisFile: lastGapFile || null,
   });
 
   // Print result
@@ -470,6 +530,8 @@ async function executeTask(
     commitSha,
     durationSeconds,
     attempt,
+    auditAttempt: auditAttempt > 0 ? auditAttempt : undefined,
+    gapAnalysisFile: lastGapFile || undefined,
   };
 }
 
@@ -577,4 +639,146 @@ async function runCritic(
     criticLogFile: criticLog,
     diffFile: diffOutputFile,
   };
+}
+
+async function runAuditAndFix(
+  ctx: RunContext,
+  task: ParsedTask,
+  logDir: string,
+  auditAttempt: number,
+  claudeJsonSrc: string,
+  claudeSnapshot: string,
+  preTaskSha: string,
+  previousGapAnalysis?: string,
+): Promise<{ fixed: boolean; gapAnalysisFile: string; auditLogFile: string }> {
+  console.log(chalk.dim(`  Running audit + fix attempt ${auditAttempt} for ${task.taskId}…`));
+
+  const taskLogDir = join(logDir, task.taskId);
+
+  // 1. Capture current diff
+  const diffFile = join(taskLogDir, `audit-diff-attempt-${auditAttempt}.patch`);
+  captureDiff(ctx.worktreeDir, diffFile, preTaskSha);
+  const diffContent = readFileSync(diffFile, 'utf-8');
+
+  // 2. Build audit+fix prompt
+  const gapFile = join(taskLogDir, `gap-analysis-T${task.taskId}-attempt-${auditAttempt}.md`);
+  const prompt = buildAuditFixPrompt(task, diffContent, gapFile, previousGapAnalysis);
+
+  // 3. Write prompt to temp file
+  const promptFile = join(tmpdir(), `noxdev-audit-fix-prompt-${ctx.runId}-${task.taskId}-${auditAttempt}.md`);
+  writeFileSync(promptFile, prompt, 'utf-8');
+
+  // 4. Resolve Opus auth
+  const globalConfig = loadGlobalConfig();
+  const auditAuth = resolveAuditAuth(globalConfig.accounts, globalConfig.audit?.model || 'claude-opus-4-6');
+
+  // 5. Restore credential snapshot before Docker run
+  if (existsSync(claudeSnapshot)) {
+    copyFileSync(claudeSnapshot, claudeJsonSrc);
+  }
+
+  // 6. Run Docker with Opus model
+  const auditLog = join(taskLogDir, `audit-fix-attempt-${auditAttempt}.log`);
+  const dockerResult = runTaskInDocker(
+    {
+      promptFile,
+      taskLog: auditLog,
+      timeoutSeconds: ctx.projectConfig?.docker?.timeout_minutes ? ctx.projectConfig.docker.timeout_minutes * 60 : 1800,
+      worktreeDir: ctx.worktreeDir,
+      projectGitDir: ctx.projectGitDir,
+      gitTargetPath: ctx.gitTargetPath,
+      memoryLimit: ctx.projectConfig?.docker?.memory || '4g',
+      cpuLimit: ctx.projectConfig?.docker?.cpus || 2,
+      dockerImage: 'noxdev-runner:latest',
+      model: globalConfig.audit?.model || 'claude-opus-4-6',
+    },
+    auditAuth,
+  );
+
+  // Clean up prompt file
+  try {
+    unlinkSync(promptFile);
+  } catch {
+    // ignore
+  }
+
+  // 7. Check if gap file was written and contains NO_GAPS_FOUND
+  let fixed = false;
+  if (existsSync(gapFile)) {
+    const gaps = readFileSync(gapFile, 'utf-8');
+    fixed = gaps.includes('NO_GAPS_FOUND');
+  }
+
+  return { fixed, gapAnalysisFile: gapFile, auditLogFile: auditLog };
+}
+
+async function runReAudit(
+  ctx: RunContext,
+  task: ParsedTask,
+  logDir: string,
+  auditAttempt: number,
+  claudeJsonSrc: string,
+  claudeSnapshot: string,
+  preTaskSha: string,
+  previousGapAnalysis: string,
+): Promise<{ clean: boolean; gapAnalysisFile: string; auditLogFile: string }> {
+  console.log(chalk.dim(`  Running re-audit (clean eyes) for ${task.taskId}…`));
+
+  const taskLogDir = join(logDir, task.taskId);
+
+  // 1. Capture current diff
+  const diffFile = join(taskLogDir, `reaudit-diff-attempt-${auditAttempt}.patch`);
+  captureDiff(ctx.worktreeDir, diffFile, preTaskSha);
+  const diffContent = readFileSync(diffFile, 'utf-8');
+
+  // 2. Build re-audit prompt (read-only)
+  const gapFile = join(taskLogDir, `reaudit-analysis-T${task.taskId}-attempt-${auditAttempt}.md`);
+  const prompt = buildReAuditPrompt(task, diffContent, previousGapAnalysis, gapFile);
+
+  // 3. Write prompt to temp file
+  const promptFile = join(tmpdir(), `noxdev-reaudit-prompt-${ctx.runId}-${task.taskId}-${auditAttempt}.md`);
+  writeFileSync(promptFile, prompt, 'utf-8');
+
+  // 4. Resolve Opus auth
+  const globalConfig = loadGlobalConfig();
+  const auditAuth = resolveAuditAuth(globalConfig.accounts, globalConfig.audit?.model || 'claude-opus-4-6');
+
+  // 5. Restore credential snapshot before Docker run
+  if (existsSync(claudeSnapshot)) {
+    copyFileSync(claudeSnapshot, claudeJsonSrc);
+  }
+
+  // 6. Run Docker with Opus model (separate container for clean eyes)
+  const auditLog = join(taskLogDir, `reaudit-attempt-${auditAttempt}.log`);
+  const dockerResult = runTaskInDocker(
+    {
+      promptFile,
+      taskLog: auditLog,
+      timeoutSeconds: ctx.projectConfig?.docker?.timeout_minutes ? ctx.projectConfig.docker.timeout_minutes * 60 : 1800,
+      worktreeDir: ctx.worktreeDir,
+      projectGitDir: ctx.projectGitDir,
+      gitTargetPath: ctx.gitTargetPath,
+      memoryLimit: ctx.projectConfig?.docker?.memory || '4g',
+      cpuLimit: ctx.projectConfig?.docker?.cpus || 2,
+      dockerImage: 'noxdev-runner:latest',
+      model: globalConfig.audit?.model || 'claude-opus-4-6',
+    },
+    auditAuth,
+  );
+
+  // Clean up prompt file
+  try {
+    unlinkSync(promptFile);
+  } catch {
+    // ignore
+  }
+
+  // 7. Check if re-audit confirms NO_GAPS_FOUND or COMPLIANT
+  let clean = false;
+  if (existsSync(gapFile)) {
+    const gaps = readFileSync(gapFile, 'utf-8');
+    clean = gaps.includes('COMPLIANT') || gaps.includes('NO_GAPS_FOUND');
+  }
+
+  return { clean, gapAnalysisFile: gapFile, auditLogFile: auditLog };
 }
