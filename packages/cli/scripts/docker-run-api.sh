@@ -51,6 +51,13 @@ model="${12:-claude-sonnet-4-20250514}"
 HOST_UID=$(id -u)
 HOST_GID=$(id -g)
 
+# Mount the host's global git identity (read-only) so commits use the user's
+# real name/email instead of overriding the repo's local config.
+gitconfig_mount=()
+if [ -f "$HOME/.gitconfig" ]; then
+    gitconfig_mount=(-v "$HOME/.gitconfig":/tmp/.gitconfig:ro)
+fi
+
 timeout "$timeout_seconds" docker run --rm \
     --memory="$memory_limit" \
     --cpus="$cpu_limit" \
@@ -59,9 +66,10 @@ timeout "$timeout_seconds" docker run --rm \
     -v "$task_log_dir":"$task_log_dir" \
     -v "$prompt_file":/tmp/task-prompt.txt:ro \
     -v "$HOME/.claude":/tmp/.claude \
+    "${gitconfig_mount[@]}" \
     -e ANTHROPIC_API_KEY="$api_key" \
     -e HOME=/tmp \
     --user "$HOST_UID":"$HOST_GID" \
     "$docker_image" \
-    bash -c 'git config user.name "noxdev" && git config user.email "noxdev@local" && claude -p --dangerously-skip-permissions --model '"$model"' --effort high < /tmp/task-prompt.txt' \
+    bash -c 'claude -p --dangerously-skip-permissions --model '"$model"' --effort high < /tmp/task-prompt.txt' \
     > "$task_log" 2>&1

@@ -43,6 +43,13 @@ api_key="${11}"
 HOST_UID=$(id -u)
 HOST_GID=$(id -g)
 
+# Mount the host's global git identity (read-only) so commits use the user's
+# real name/email instead of overriding the repo's local config.
+gitconfig_mount=()
+if [ -f "$HOME/.gitconfig" ]; then
+    gitconfig_mount=(-v "$HOME/.gitconfig":/tmp/.gitconfig:ro)
+fi
+
 timeout "$timeout_seconds" docker run --rm \
     --memory="$memory_limit" \
     --cpus="$cpu_limit" \
@@ -50,9 +57,10 @@ timeout "$timeout_seconds" docker run --rm \
     -v "$project_git_dir":"$git_target_path" \
     -v "$task_log_dir":"$task_log_dir" \
     -v "$prompt_file":/tmp/task-prompt.txt:ro \
+    "${gitconfig_mount[@]}" \
     -e GEMINI_API_KEY="$api_key" \
     -e HOME=/tmp \
     --user "$HOST_UID":"$HOST_GID" \
     "$docker_image" \
-    bash -c 'git config user.name "noxdev" && git config user.email "noxdev@local" && gemini < /tmp/task-prompt.txt' \
+    bash -c 'gemini < /tmp/task-prompt.txt' \
     > "$task_log" 2>&1
