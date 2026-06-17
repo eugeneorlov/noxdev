@@ -18,7 +18,7 @@
 #   $9   docker_image      Docker image to use
 #   $10  task_log_dir      Host dir mounted at the same path so the model can write
 #                          gap-analysis files at the absolute path baked into prompts
-#   $11  model             Claude model to use (default: claude-sonnet-4-20250514)
+#   $11  model             Claude model to use (default: sonnet)
 
 set -euo pipefail
 
@@ -44,7 +44,7 @@ memory_limit="$7"
 cpu_limit="$8"
 docker_image="$9"
 task_log_dir="${10}"
-model="${11:-claude-sonnet-4-20250514}"
+model="${11:-sonnet}"
 
 HOST_UID=$(id -u)
 HOST_GID=$(id -g)

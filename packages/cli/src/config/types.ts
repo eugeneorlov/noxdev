@@ -2,6 +2,7 @@ export interface GlobalConfig {
   accounts: {
     max: {
       preferred: boolean;
+      model?: string;
       rate_limit_ceiling: number;
     };
     api: {

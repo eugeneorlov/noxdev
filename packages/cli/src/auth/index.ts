@@ -12,7 +12,7 @@ export interface AuthResult {
 }
 
 export interface AuthConfig {
-  max: { preferred: boolean };
+  max: { preferred: boolean; model?: string };
   api: { fallback: boolean; dailyCapUsd: number; model: string; key?: string };
   gemini: { fallback: boolean; model: string };
   secrets: { provider: string; globalSecretsFile: string; ageKeyFile: string };
@@ -31,7 +31,7 @@ export function isMaxAvailable(): boolean {
 
 export function resolveAuth(config: AuthConfig): AuthResult {
   if (config.max.preferred && isMaxAvailable()) {
-    return { mode: "max", model: "claude-sonnet-4-20250514" };
+    return { mode: "max", model: config.max.model || "sonnet" };
   }
 
   if (config.api.fallback) {

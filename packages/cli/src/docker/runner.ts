@@ -42,7 +42,9 @@ export function runTaskInDocker(
 
   // Add model argument as the last argument
   const modelToUse = options.model ?? auth.model;
-  args.push(modelToUse);
+  if (auth.mode !== "gemini") {
+    args.push(modelToUse);
+  }
 
   const startTime = Date.now();
 

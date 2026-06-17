@@ -32,6 +32,7 @@ vi.mock("../../config/index.js", () => ({
     accounts: {
       max: { preferred: true, rate_limit_ceiling: 80 },
       api: { fallback: true, daily_cap_usd: 5, model: "claude-sonnet-4-6" },
+      gemini: { fallback: false, model: "gemini-1.5-pro" },
     },
     safety: {
       auto_push: false,
@@ -45,7 +46,7 @@ vi.mock("../../config/index.js", () => ({
 vi.mock("../../auth/index.js", () => ({
   resolveAuth: vi.fn().mockReturnValue({
     mode: "max",
-    model: "claude-sonnet-4-20250514",
+    model: "sonnet",
   }),
   isMaxAvailable: vi.fn(),
   getMaxCredentialPath: vi.fn(),

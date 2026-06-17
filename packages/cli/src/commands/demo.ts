@@ -411,7 +411,7 @@ async function runSingleProject(project: {
 
   // Resolve auth
   const auth = resolveAuth({
-    max: { preferred: globalConfig.accounts.max.preferred },
+    max: { preferred: globalConfig.accounts.max.preferred, model: globalConfig.accounts.max.model },
     api: {
       fallback: globalConfig.accounts.api.fallback,
       dailyCapUsd: globalConfig.accounts.api.daily_cap_usd,

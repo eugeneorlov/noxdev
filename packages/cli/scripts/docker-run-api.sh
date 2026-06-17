@@ -19,7 +19,7 @@
 #   $10  task_log_dir      Host dir mounted at the same path so the model can write
 #                          gap-analysis files at the absolute path baked into prompts
 #   $11  api_key           Anthropic API key
-#   $12  model             Claude model to use (default: claude-sonnet-4-20250514)
+#   $12  model             Claude model to use (default: sonnet)
 
 set -euo pipefail
 
@@ -46,7 +46,7 @@ cpu_limit="$8"
 docker_image="$9"
 task_log_dir="${10}"
 api_key="${11}"
-model="${12:-claude-sonnet-4-20250514}"
+model="${12:-sonnet}"
 
 HOST_UID=$(id -u)
 HOST_GID=$(id -g)

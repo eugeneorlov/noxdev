@@ -97,7 +97,7 @@ async function runProject(project: ProjectRow): Promise<void> {
 
   // Resolve auth
   const authConfig: AuthConfig = {
-    max: { preferred: globalConfig.accounts.max.preferred },
+    max: { preferred: globalConfig.accounts.max.preferred, model: globalConfig.accounts.max.model },
     api: {
       fallback: globalConfig.accounts.api.fallback,
       dailyCapUsd: globalConfig.accounts.api.daily_cap_usd,
@@ -185,7 +185,7 @@ export async function runAllProjects(
   // Resolve auth once before the loop
   const globalConfig = loadGlobalConfig();
   const authConfig: AuthConfig = {
-    max: { preferred: globalConfig.accounts.max.preferred },
+    max: { preferred: globalConfig.accounts.max.preferred, model: globalConfig.accounts.max.model },
     api: {
       fallback: globalConfig.accounts.api.fallback,
       dailyCapUsd: globalConfig.accounts.api.daily_cap_usd,

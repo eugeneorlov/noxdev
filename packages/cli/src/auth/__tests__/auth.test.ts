@@ -16,7 +16,8 @@ import { resolveAuth, isMaxAvailable } from "../index.js";
 
 const baseConfig: AuthConfig = {
   max: { preferred: true },
-  api: { fallback: true, dailyCapUsd: 5, model: "claude-sonnet-4-20250514" },
+  api: { fallback: true, dailyCapUsd: 5, model: "claude-sonnet-4-6" },
+  gemini: { fallback: false, model: "gemini-1.5-pro" },
   secrets: {
     provider: "sops-age",
     globalSecretsFile: "/secrets/global.enc.json",
@@ -37,9 +38,26 @@ describe("resolveAuth", () => {
 
     expect(result).toEqual({
       mode: "max",
-      model: "claude-sonnet-4-20250514",
+      model: "sonnet",
     });
     expect(result.apiKey).toBeUndefined();
+  });
+
+  it("returns the configured max.model in max mode when set", () => {
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readFileSync).mockReturnValue('{"token":"abc"}');
+
+    const config: AuthConfig = {
+      ...baseConfig,
+      max: { ...baseConfig.max, model: "claude-sonnet-4-6" },
+    };
+
+    const result = resolveAuth(config);
+
+    expect(result).toEqual({
+      mode: "max",
+      model: "claude-sonnet-4-6",
+    });
   });
 
   it("falls back to api mode when max credentials missing and api fallback enabled", () => {
@@ -51,7 +69,7 @@ describe("resolveAuth", () => {
     expect(result).toEqual({
       mode: "api",
       apiKey: "sk-ant-test-key",
-      model: "claude-sonnet-4-20250514",
+      model: "claude-sonnet-4-6",
     });
   });
 
@@ -64,7 +82,7 @@ describe("resolveAuth", () => {
     };
 
     expect(() => resolveAuth(config)).toThrow(
-      "No auth available. Max credentials not found at ~/.claude.json and API fallback is disabled or decryption failed.",
+      "No auth available. Max credentials not found at ~/.claude.json, and API/Gemini fallback is disabled or decryption failed.",
     );
   });
 });

@@ -7,6 +7,7 @@ const DEFAULT_GLOBAL_CONFIG: GlobalConfig = {
   accounts: {
     max: {
       preferred: true,
+      model: "sonnet",
       rate_limit_ceiling: 80,
     },
     api: {

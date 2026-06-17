@@ -11,8 +11,8 @@ export interface ModelPrice {
 }
 
 const DEFAULT_PRICING: Record<string, ModelPrice> = {
-  'claude-opus-4-20250514': { input: 15.00, output: 75.00, cache_read: 1.50, cache_write: 18.75 },
-  'claude-sonnet-4-20250514': { input: 3.00, output: 15.00, cache_read: 0.30, cache_write: 3.75 },
+  'claude-opus-4-6': { input: 15.00, output: 75.00, cache_read: 1.50, cache_write: 18.75 },
+  'claude-sonnet-4-6': { input: 3.00, output: 15.00, cache_read: 0.30, cache_write: 3.75 },
   'claude-haiku-4-5-20251001': { input: 1.00, output: 5.00, cache_read: 0.10, cache_write: 1.25 }
 };
 
