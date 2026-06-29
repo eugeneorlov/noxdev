@@ -50,7 +50,15 @@ if [ -f "$HOME/.gitconfig" ]; then
     gitconfig_mount=(-v "$HOME/.gitconfig":/tmp/.gitconfig:ro)
 fi
 
-timeout "$timeout_seconds" docker run --rm \
+# Resolve a timeout binary. Linux has GNU `timeout`; macOS ships `gtimeout`
+# via coreutils (brew install coreutils). Without this the run aborts with 127.
+TIMEOUT_BIN="$(command -v timeout || command -v gtimeout || true)"
+if [ -z "$TIMEOUT_BIN" ]; then
+  echo "Error: no 'timeout' or 'gtimeout' found. Install GNU coreutils (brew install coreutils)." >&2
+  exit 1
+fi
+
+"$TIMEOUT_BIN" "$timeout_seconds" docker run --rm \
     --memory="$memory_limit" \
     --cpus="$cpu_limit" \
     -v "$worktree_dir":/workspace \
