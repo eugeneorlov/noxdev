@@ -409,20 +409,25 @@ async function runSingleProject(project: {
   const globalConfig = loadGlobalConfig();
   const projectConfig = loadProjectConfig(project.repo_path);
 
-  // Resolve auth
-  const auth = resolveAuth({
+  // Resolve auth (mirror run.ts: include gemini + keep authConfig for the context)
+  const authConfig = {
     max: { preferred: globalConfig.accounts.max.preferred, model: globalConfig.accounts.max.model },
     api: {
       fallback: globalConfig.accounts.api.fallback,
       dailyCapUsd: globalConfig.accounts.api.daily_cap_usd,
       model: globalConfig.accounts.api.model,
     },
+    gemini: {
+      fallback: globalConfig.accounts.gemini.fallback,
+      model: globalConfig.accounts.gemini.model,
+    },
     secrets: {
       provider: globalConfig.secrets.provider,
       globalSecretsFile: globalConfig.secrets.global,
       ageKeyFile: globalConfig.secrets.age_key,
     },
-  });
+  };
+  const auth = resolveAuth(authConfig);
 
   const runId = generateRunId();
   const gitDir = join(project.repo_path, ".git");
@@ -430,12 +435,14 @@ async function runSingleProject(project: {
   const ctx = {
     projectId: project.id,
     projectConfig,
+    globalConfig,
     worktreeDir: project.worktree_path,
     projectGitDir: gitDir,
     gitTargetPath: gitDir,
     runId,
     db,
     auth,
+    authConfig,
   };
 
   await executeRun(ctx);

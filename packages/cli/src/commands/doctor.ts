@@ -91,6 +91,28 @@ export function registerDoctor(program: Command): void {
         }
       }));
 
+      // 4b. timeout/gtimeout (container runs are wrapped in `timeout`; macOS lacks GNU coreutils)
+      checks.push(runCheck("timeout/gtimeout available", true, 'prerequisites', () => {
+        try {
+          execSync("command -v timeout || command -v gtimeout", { stdio: "pipe" });
+          return { passed: true };
+        } catch {
+          return { passed: false, message: "No 'timeout' or 'gtimeout' found. macOS: brew install coreutils" };
+        }
+      }));
+
+      // 4c. Max OAuth token for headless auth on macOS (Keychain login can't reach the container)
+      checks.push(runCheck("Max OAuth token (macOS)", false, 'prerequisites', () => {
+        if (process.platform !== "darwin") {
+          return { passed: true, message: "n/a (not macOS)" };
+        }
+        const tokenPath = join(homedir(), ".noxdev", "max-oauth-token");
+        if (existsSync(tokenPath)) {
+          return { passed: true };
+        }
+        return { passed: false, message: "Missing ~/.noxdev/max-oauth-token. Run 'claude setup-token' and save it there." };
+      }));
+
       // 5. Docker image exists
       checks.push(runCheck("Docker image exists", false, 'managed', () => {
         try {
