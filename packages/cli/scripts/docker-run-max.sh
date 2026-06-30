@@ -56,7 +56,33 @@ if [ -f "$HOME/.gitconfig" ]; then
     gitconfig_mount=(-v "$HOME/.gitconfig":/tmp/.gitconfig:ro)
 fi
 
-timeout "$timeout_seconds" docker run --rm \
+# Resolve a timeout binary. Linux has GNU `timeout`; macOS ships `gtimeout`
+# via coreutils (brew install coreutils). Without this the run aborts with 127.
+TIMEOUT_BIN="$(command -v timeout || command -v gtimeout || true)"
+if [ -z "$TIMEOUT_BIN" ]; then
+  echo "Error: no 'timeout' or 'gtimeout' found. Install GNU coreutils (brew install coreutils)." >&2
+  exit 1
+fi
+
+# Headless Max authentication.
+# On macOS the interactive login token lives in the Keychain, refresh-rotated and
+# OS-locked, so it can't be used inside a Linux container. The supported headless/CI
+# path is a long-lived OAuth token created once with `claude setup-token`, stored
+# 0600 at ~/.noxdev/max-oauth-token, and passed to the container's claude as
+# CLAUDE_CODE_OAUTH_TOKEN. It is exported (so it stays out of argv / `ps`) and is
+# never printed. Falls back silently if the file is absent (e.g. Linux file-creds).
+oauth_env=()
+TOKEN_FILE="$HOME/.noxdev/max-oauth-token"
+if [ -f "$TOKEN_FILE" ] && [ -s "$TOKEN_FILE" ]; then
+  CLAUDE_CODE_OAUTH_TOKEN="$(cat "$TOKEN_FILE")"
+  export CLAUDE_CODE_OAUTH_TOKEN
+  oauth_env=(-e CLAUDE_CODE_OAUTH_TOKEN)
+elif [ "$(uname)" = "Darwin" ]; then
+  echo "Warning: no Max OAuth token at $TOKEN_FILE." >&2
+  echo "         Create one: run 'claude setup-token' and save the token there (chmod 600)." >&2
+fi
+
+"$TIMEOUT_BIN" "$timeout_seconds" docker run --rm \
     --memory="$memory_limit" \
     --cpus="$cpu_limit" \
     -v "$worktree_dir":/workspace \
@@ -64,6 +90,7 @@ timeout "$timeout_seconds" docker run --rm \
     -v "$task_log_dir":"$task_log_dir" \
     -v ~/.claude:/tmp/.claude \
     -v ~/.claude.json:/tmp/.claude.json \
+    ${oauth_env[@]+"${oauth_env[@]}"} \
     "${gitconfig_mount[@]}" \
     -e HOME=/tmp \
     --user "$HOST_UID":"$HOST_GID" \
