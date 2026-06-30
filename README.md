@@ -67,6 +67,7 @@ Tasks are defined in `TASKS.md` using this format:
 - `FILES`: Files the task should focus on (hints, not constraints)
 - `VERIFY`: Command to run after completion to validate the task
 - `CRITIC`: `skip` | `review` (whether to run critic agent review)
+- `AUDIT`: `skip` (optional — opts this task out of the audit-fix loop; otherwise the loop runs when enabled globally)
 - `SPEC`: Detailed task specification
 
 ## Architecture
@@ -90,6 +91,27 @@ graph TB
 The flow: **TASKS.md** → **noxdev CLI** → **Docker container** (Claude Code agent) → **git commit** → **morning review** (CLI or dashboard) → **merge to main**.
 
 Safety layers include Docker containment, worktree isolation, and critic agent review. The agent always commits its work to the worktree branch, which stays isolated until you decide to merge.
+
+## Audit & self-correction
+
+Once a task reaches `COMPLETED`, noxdev runs an **audit-fix loop** to catch gaps before you ever see the diff:
+
+1. **Audit + fix** — an agent compares the task's diff against its `SPEC`, writes a gap analysis, and fixes every gap it finds.
+2. **Re-audit** — a separate clean-eyes agent re-checks the work. If it confirms no gaps remain, the loop exits.
+3. **Retry** — if gaps remain, the re-audit's findings are fed back into the next attempt. The loop repeats up to `max_attempts`.
+
+If an audit container exits without producing a gap analysis, the loop aborts cleanly rather than looping on stale state. The audit agent can run on a different model than the task agent (it defaults to a stronger model for review).
+
+Configure it in your global config (`~/.noxdev/config.*`):
+
+```yaml
+audit:
+  enabled: true              # run the audit-fix loop after each completed task
+  model: claude-opus-4-6     # model used for audit + re-audit
+  max_attempts: 3            # max audit→fix→re-audit cycles per task
+```
+
+Opt a single task out with `AUDIT: skip` in its `TASKS.md` block.
 
 ## CLI Commands
 

@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-06-30
+
+### Added
+- **Audit-fix loop.** After a task reaches `COMPLETED`, an agent audits the diff against the spec, writes a gap analysis, and fixes any gaps it finds; a separate clean-eyes re-audit then verifies the work. The cycle repeats up to `max_attempts` (default 3) until the re-audit confirms all gaps are resolved, or aborts early if an audit container exits without producing a gap analysis.
+- New `audit` block in global config: `enabled` (default `true`), `model` (default `claude-opus-4-6`), and `max_attempts` (default `3`).
+- Per-task `AUDIT` field in `TASKS.md` — set `AUDIT: skip` to opt an individual task out of the audit loop.
+- `resolveAuditAuth` resolves the audit agent's model/credentials independently of the task agent, threaded through `RunContext` via `globalConfig`.
+- Audit columns added to the SQLite ledger schema (with migration); `auditAttempt` and `gapAnalysisFile` are now recorded on each task result.
+- Per-task model selection threaded through the Docker runner, types, and `docker-run-*.sh` scripts (each now accepts an optional `model` argument).
+
+### Fixed
+- Hardening for model selection across the Docker runner and bash scripts.
+- Docker mount fixes: `~/.claude` mount for Claude session access, and the pnpm store is no longer tracked.
+- Audit loop aborts cleanly when an audit or re-audit container exits abnormally without writing a gap-analysis file, instead of looping on stale state.
+
 ## [1.3.5] - 2026-04-23
 
 ### Added
