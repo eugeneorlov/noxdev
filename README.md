@@ -70,6 +70,8 @@ Tasks are defined in `TASKS.md` using this format:
 - `AUDIT`: `skip` (optional — opts this task out of the audit-fix loop; otherwise the loop runs when enabled globally)
 - `SPEC`: Detailed task specification
 
+See the [`samples/`](samples/) directory for complete, real-world `TASKS.md` examples (e.g. a fullstack ride planner built from scratch).
+
 ## Architecture
 
 ```mermaid
