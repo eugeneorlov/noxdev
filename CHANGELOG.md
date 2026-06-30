@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.1] - 2026-06-30
+
+### Fixed
+- **macOS support.** `noxdev` could not complete a run on macOS; four stacked issues fixed (Linux behaviour unchanged):
+  - Runner scripts (`docker-run-max.sh`, `-api.sh`, `-gemini.sh`) now resolve `timeout || gtimeout` — macOS lacks GNU coreutils `timeout`, which made every task exit 127.
+  - `docker-run-max.sh` authenticates the container via `CLAUDE_CODE_OAUTH_TOKEN` read from `~/.noxdev/max-oauth-token` (`claude setup-token`); the macOS Keychain login token is OS-locked and its stored access token is perpetually stale inside a Linux container.
+  - `noxdev doctor` adds `timeout`/`gtimeout` (critical) and macOS Max OAuth token (warning) prerequisite checks.
+  - `noxdev demo` builds the orchestrator context with `globalConfig`/`authConfig` (mirroring `run.ts`), fixing a runtime crash and type error.
+
 ## [1.4.0] - 2026-06-30
 
 ### Added
