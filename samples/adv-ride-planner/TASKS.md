@@ -12,7 +12,6 @@
 - STATUS: pending
 - FILES: backend/src/__init__.py, backend/src/database.py, backend/src/models/__init__.py, backend/src/models/ride.py
 - VERIFY: cd backend && uv run python -c "from src.models.ride import Ride, Waypoint, WaypointType, RideCreateWithWaypoints, RideOut, RideListItem" && uv run python -c "from src.database import engine, get_session, create_db_and_tables"
-- CRITIC: skip
 - PUSH: auto
 - SPEC: Build the persistence layer using SQLModel over SQLite.
 
@@ -56,7 +55,6 @@
 - STATUS: pending
 - FILES: backend/src/services/__init__.py, backend/src/services/ride_service.py, backend/src/routes/__init__.py, backend/src/routes/rides.py, backend/src/main.py, backend/main.py
 - VERIFY: cd backend && uv run python -c "from src.main import app; paths={r.path for r in app.routes}; assert '/api/rides/' in paths and '/api/rides/{ride_id}' in paths, sorted(paths)"
-- CRITIC: review
 - PUSH: auto
 - SPEC: Build the service layer, REST routes, and the FastAPI application.
 
@@ -92,7 +90,6 @@
 - STATUS: pending
 - FILES: backend/tests/__init__.py, backend/tests/test_rides.py, backend/scripts/seed.py
 - VERIFY: cd backend && uv run pytest -q
-- CRITIC: review
 - PUSH: auto
 - SPEC: Add a comprehensive test suite and a realistic seed script.
 
@@ -116,7 +113,6 @@
 - STATUS: pending
 - FILES: frontend/src/main.tsx, frontend/src/App.tsx, frontend/src/style.css, frontend/src/types.ts, frontend/src/api.ts, frontend/vite.config.ts, frontend/index.html
 - VERIFY: cd frontend && pnpm build
-- CRITIC: skip
 - PUSH: auto
 - SPEC: Establish the React app shell, routing, typed API client, and Tailwind + Leaflet styling.
 
@@ -153,7 +149,6 @@
 - STATUS: pending
 - FILES: frontend/src/pages/RideListPage.tsx, frontend/src/components/RideCard.tsx
 - VERIFY: cd frontend && pnpm build && grep -q "waypoint_count" src/components/RideCard.tsx
-- CRITIC: skip
 - PUSH: auto
 - SPEC: Build the landing list view.
 
@@ -175,7 +170,6 @@
 - STATUS: pending
 - FILES: frontend/src/pages/RideDetailPage.tsx, frontend/src/components/RideStats.tsx, frontend/src/components/RouteMap.tsx
 - VERIFY: cd frontend && pnpm build && grep -q "react-leaflet" src/components/RouteMap.tsx
-- CRITIC: review
 - PUSH: auto
 - SPEC: Build the read-only ride detail experience with a real map.
 
@@ -201,7 +195,6 @@
 - STATUS: pending
 - FILES: frontend/src/pages/RideEditorPage.tsx, frontend/src/components/WaypointList.tsx
 - VERIFY: cd frontend && pnpm build && grep -q "createRide\|updateRide" src/pages/RideEditorPage.tsx
-- CRITIC: review
 - PUSH: auto
 - SPEC: Build create/edit, the interactive part of the app.
 

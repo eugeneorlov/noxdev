@@ -6,6 +6,9 @@ export interface ParsedTask {
   status: string;
   files: string[];
   verify: string;
+  // Legacy/optional. The documented task format no longer includes CRITIC;
+  // review is handled by the audit-fix loop. Defaults to 'skip'; a task may
+  // still set 'review' explicitly to opt into critic-agent review.
   critic: string;
   audit?: 'skip' | 'enabled';
   spec: string;
@@ -35,7 +38,7 @@ export function parseTasks(
         status: 'pending',
         files: [],
         verify: '',
-        critic: 'review',
+        critic: 'skip',
         spec: '',
       };
       inSpec = false;

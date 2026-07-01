@@ -11,7 +11,6 @@
 - STATUS: pending
 - FILES: backend/main.py, backend/pyproject.toml, backend/test_main.py
 - VERIFY: cd backend && uv sync && uv run python -c "import main" && grep -q "todos" main.py
-- CRITIC: skip
 - PUSH: auto
 - SPEC: Create a FastAPI backend that serves a todos API.
 
@@ -49,7 +48,6 @@
 - STATUS: pending
 - FILES: frontend/src/App.tsx, frontend/src/App.css, frontend/package.json
 - VERIFY: cd frontend && pnpm build && grep -q "localhost:8000" src/App.tsx
-- CRITIC: skip
 - PUSH: auto
 - SPEC: Create a React frontend that communicates with the FastAPI backend.
 
@@ -81,7 +79,6 @@
 - STATUS: pending
 - FILES: package.json, README.md, backend/.env.example
 - VERIFY: grep -q "dev:frontend" package.json && grep -q "fullstack" README.md
-- CRITIC: skip
 - PUSH: auto
 - SPEC: Add workspace scripts and comprehensive documentation.
 

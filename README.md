@@ -55,7 +55,6 @@ Tasks are defined in `TASKS.md` using this format:
 - STATUS: pending
 - FILES: src/auth.ts, src/middleware/auth.ts
 - VERIFY: npm test && npm run build
-- CRITIC: review
 - SPEC: Implement JWT-based authentication for the API.
   Add login/logout endpoints with bcrypt password hashing.
   Create middleware for route protection.
@@ -66,7 +65,6 @@ Tasks are defined in `TASKS.md` using this format:
 - `STATUS`: `pending` | `done` | `failed` | `skipped`
 - `FILES`: Files the task should focus on (hints, not constraints)
 - `VERIFY`: Command to run after completion to validate the task
-- `CRITIC`: `skip` | `review` (whether to run critic agent review)
 - `AUDIT`: `skip` (optional — opts this task out of the audit-fix loop; otherwise the loop runs when enabled globally)
 - `SPEC`: Detailed task specification
 
@@ -87,12 +85,12 @@ graph TB
     I[Safety Layers]
     I --> J[Docker Containment]
     I --> K[Worktree Isolation]
-    I --> L[Critic Agent]
+    I --> L[Audit-Fix Loop]
 ```
 
 The flow: **TASKS.md** → **noxdev CLI** → **Docker container** (Claude Code agent) → **git commit** → **morning review** (CLI or dashboard) → **merge to main**.
 
-Safety layers include Docker containment, worktree isolation, and critic agent review. The agent always commits its work to the worktree branch, which stays isolated until you decide to merge.
+Safety layers include Docker containment, worktree isolation, and the audit-fix loop. The agent always commits its work to the worktree branch, which stays isolated until you decide to merge.
 
 ## Audit & self-correction
 

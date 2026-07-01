@@ -92,7 +92,7 @@ describe('parseTasks', () => {
     const t = tasks[0];
     expect(t.files).toEqual([]);
     expect(t.verify).toBe('');
-    expect(t.critic).toBe('review');
+    expect(t.critic).toBe('skip');
     expect(t.spec).toBe('');
   });
 

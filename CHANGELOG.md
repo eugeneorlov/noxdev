@@ -5,7 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.4.1] - 2026-06-30
+## [Unreleased]
+
+### Changed
+- **Dropped the `CRITIC` field from the documented `TASKS.md` format.** Review is now handled by the audit-fix loop, so per-task critic control is no longer part of the task spec. Removed `CRITIC` from the README task format, the `TASKS.md` template, the demo tasks, and the `samples/` example.
+- **The parser default for an absent `CRITIC` flipped from `review` to `skip`.** Previously, omitting the field meant every completed task ran the critic agent; now omitting it means no critic review (the audit-fix loop is the default gate). This makes deleting the field a no-op for the common case instead of silently enabling critic review on every task.
+
+### Notes
+- Backward compatible: the parser still recognizes a `CRITIC:` line if present, and a task may still set `CRITIC: review` explicitly to opt into critic-agent review. `runCritic()` and the `critic`/`critic_mode` ledger columns are unchanged.
 
 ### Fixed
 - **macOS support.** `noxdev` could not complete a run on macOS; four stacked issues fixed (Linux behaviour unchanged):

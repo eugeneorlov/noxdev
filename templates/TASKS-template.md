@@ -20,7 +20,6 @@ A TASKS.md file is an execution unit. One file = one noxdev run. Archive or dele
 - STATUS: pending
 - FILES: comma-separated list of files this task will touch
 - VERIFY: shell command that must exit 0 for the task to be considered done
-- CRITIC: skip | review
 - SPEC: The actual directive. Multi-line allowed. Include inline code, SQL, config.
   The more specific the better. Agents invent patterns when given descriptions;
   agents follow patterns when given working code.
@@ -53,11 +52,6 @@ Bad VERIFY examples:
 - `cd packages/cli && pnpm build` (only catches syntax errors, not integration)
 - `test -f dist/feature.js` (file exists but may be empty or broken)
 
-### CRITIC
-
-- `skip` — no critic review. Default for infrastructure changes, chicken-and-egg fixes, and mechanical work.
-- `review` — critic agent reviews the diff. Use for changes where silent regressions hurt, or for any task with wide surface area.
-
 ### SPEC
 
 The actual directive. Write it like you would write a pull request description for a junior engineer who has access to the codebase but not to your head.
@@ -76,7 +70,6 @@ The actual directive. Write it like you would write a pull request description f
 - STATUS: pending
 - FILES: packages/cli/src/commands/cost.ts
 - VERIFY: cd packages/cli && pnpm build && node dist/index.js cost --help | grep -q "since" && node dist/index.js cost --since 7d | grep -qi "tokens"
-- CRITIC: skip
 - SPEC: Add a --since flag that filters the cost summary by time window.
   Accept formats: '7d', '30d', 'YYYY-MM-DD', 'all' (default 'all').
   
