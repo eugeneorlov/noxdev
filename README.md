@@ -10,7 +10,7 @@
 
 Ship code while you sleep
 
-[![npm version](https://img.shields.io/badge/npm-1.3.5-green.svg)](https://www.npmjs.com/package/noxdev)
+[![npm version](https://img.shields.io/badge/npm-1.4.1-green.svg)](https://www.npmjs.com/package/@eugene218/noxdev)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D24.0.0-brightgreen.svg)](https://nodejs.org/)
 
@@ -25,7 +25,7 @@ An open-source Node.js CLI that orchestrates autonomous coding agents overnight.
 </div>
 
 ```bash
-npm install -g noxdev
+npm install -g @eugene218/noxdev
 noxdev doctor                           # check prerequisites
 noxdev init my-project --repo ~/my-repo # register a project
 # write tasks in ~/worktrees/my-project/TASKS.md
